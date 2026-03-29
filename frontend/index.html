@@ -1,0 +1,1349 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fragment Mapper — Koher</title>
+<meta name="description" content="See the structural relationships between your scattered text fragments.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/frontend/koher-ui.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 60 35 Q 100 65, 60 100 Q 20 135, 60 165' fill='none' stroke='%234A6FA5' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M 100 35 Q 60 65, 100 100 Q 140 135, 100 165' fill='none' stroke='%23E8B86D' stroke-width='16' stroke-linecap='round'/%3E%3Cpath d='M 140 35 Q 100 65, 140 100 Q 180 135, 140 165' fill='none' stroke='%23F7F3ED' stroke-width='14' stroke-linecap='round' opacity='0.8'/%3E%3C/svg%3E">
+
+<style>
+/* ── Fragment Mapper — tool-specific styles ──────────────────────── */
+
+/* Hero */
+.fm-hero {
+  padding: 32px 24px 8px;
+  text-align: center;
+}
+.fm-hero-title {
+  user-select: none;
+  margin-bottom: 10px;
+  line-height: 1;
+}
+.fm-hero-title .h-name {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: 34px;
+  color: var(--light);
+}
+.fm-hero-title .h-type {
+  display: block;
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--light2);
+  margin-top: 8px;
+}
+.fm-hero-sub {
+  font-size: 15px;
+  color: var(--light2);
+  max-width: 460px;
+  margin: 0 auto 14px;
+  line-height: 1.6;
+}
+.fm-hero-rule {
+  width: 48px;
+  height: 1px;
+  background: var(--border-dark);
+  margin: 0 auto;
+}
+
+
+/* Input panel */
+.fm-input-section { padding: 12px 24px 8px; }
+
+.fm-input-panel {
+  background: #252B2D;
+  border: 1px solid var(--border-dark);
+  border-left: 3px solid var(--accent);
+  padding: 24px;
+  border-radius: 0 8px 8px 0;
+}
+
+.fm-input-label {
+  font-family: var(--font-label);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--light2);
+  margin-bottom: 14px;
+  display: block;
+}
+
+.fm-textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: 18px;
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: rgba(247, 243, 237, 0.7);
+  background: var(--bg);
+  border: 1px solid var(--border-dark);
+  border-radius: 4px;
+  resize: vertical;
+  scrollbar-width: none;
+}
+.fm-textarea::-webkit-scrollbar { display: none; }
+.fm-textarea:focus { outline: none; border-color: var(--accent); }
+.fm-textarea::placeholder { color: var(--light3); }
+
+.fm-input-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.fm-frag-count {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--light3);
+  transition: color 0.2s;
+}
+.fm-frag-count.valid { color: var(--accent); }
+
+.fm-input-right {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+
+.fm-remaining {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--light2);
+}
+
+
+/* Canvas wrapper — contained, not full-width */
+.fm-canvas-wrapper {
+  padding: 24px 24px 0;
+}
+
+.fm-canvas-box {
+  max-width: 720px;
+  margin: 0 auto;
+  border: 1px solid var(--border-dark);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #1E2523;
+}
+
+.fm-canvas-header {
+  padding: 14px 20px 10px;
+  border-bottom: 1px solid rgba(74, 69, 67, 0.4);
+  display: flex;
+  align-items: baseline;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.fm-canvas-title {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--light2);
+}
+.fm-canvas-sub {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--light3);
+}
+
+/* Canvas */
+.fm-canvas {
+  width: 100%;
+  height: 400px;
+  position: relative;
+  background: #1E2523;
+}
+
+.fm-canvas-loading {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  z-index: 6;
+}
+
+/* Legend (visual key — now above canvas) */
+.fm-legend {
+  padding: 14px 20px 14px;
+  border-bottom: 1px solid rgba(74, 69, 67, 0.4);
+}
+.fm-legend-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px 28px;
+}
+.fm-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 12.5px;
+  line-height: 1.4;
+}
+.fm-legend-icon {
+  flex-shrink: 0;
+  width: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.fm-legend-icon svg { display: block; }
+.fm-legend-text {
+  color: var(--light2);
+  font-family: var(--font-body);
+}
+.fm-legend-text strong {
+  color: var(--light);
+  font-weight: 500;
+}
+.fm-legend-note {
+  color: var(--light3);
+  font-style: italic;
+  font-size: 11px;
+}
+
+/* Key (fragment labels below canvas) */
+.fm-canvas-key {
+  padding: 18px 24px;
+  border-top: 1px solid rgba(74, 69, 67, 0.5);
+}
+.fm-key-items {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+}
+.fm-key-item {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.fm-key-num {
+  font-family: var(--font-mono);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--light);
+  flex-shrink: 0;
+  min-width: 18px;
+  text-align: right;
+}
+.fm-key-text {
+  font-family: var(--font-body);
+  font-style: italic;
+  color: var(--light2);
+}
+
+
+/* Results */
+.fm-results {
+  padding: 40px 24px 80px;
+  display: none;
+}
+
+/* Fragment echo list */
+.fm-echo-list {
+  margin-bottom: 24px;
+}
+.fm-echo-item {
+  display: flex;
+  gap: 12px;
+  padding: 10px 0;
+  border-bottom: 1px solid #E4DDD5;
+  font-size: 13.5px;
+  line-height: 1.6;
+}
+.fm-echo-item:last-child { border-bottom: none; }
+.fm-echo-num {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink3);
+  flex-shrink: 0;
+  width: 20px;
+  text-align: right;
+  padding-top: 2px;
+}
+.fm-echo-text {
+  color: var(--ink2);
+  font-family: var(--font-body);
+  font-style: italic;
+}
+
+/* Summary chips row */
+.fm-summary {
+  margin-bottom: 28px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid #E4DDD5;
+}
+.fm-summary-label {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink3);
+  margin-bottom: 10px;
+}
+
+/* Chip links */
+a.k-chip { text-decoration: none; cursor: pointer; transition: border-color 0.2s; }
+a.k-chip:hover { border-color: var(--accent); text-decoration: none; }
+
+/* Results heading */
+.fm-results-heading {
+  margin-bottom: 24px;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #E4DDD5;
+}
+
+/* Section label with note */
+.fm-section-label {
+  margin-bottom: 12px;
+  margin-top: 28px;
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.fm-section-note {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink3);
+}
+
+
+/* Tool wordmark in header */
+.fm-wordmark {
+  user-select: none;
+  display: flex;
+  flex-direction: column;
+  line-height: 1;
+}
+.fm-wordmark .w-name {
+  font-family: var(--font-label);
+  font-weight: 500;
+  font-size: 15px;
+  color: var(--light);
+  letter-spacing: -0.01em;
+}
+.fm-wordmark .w-type {
+  font-family: var(--font-label);
+  font-weight: 500;
+  font-size: 8px;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-top: 2px;
+}
+
+
+/* ── Responsive ──────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .fm-hero-title .h-name { font-size: 28px; }
+  .fm-hero-sub { font-size: 15px; }
+  .fm-input-panel { padding: 20px; }
+  .fm-textarea { min-height: 180px; font-size: 15px; }
+  .fm-input-foot { flex-direction: column; gap: 12px; }
+  .fm-input-foot .k-btn-primary { width: 100%; }
+  .fm-canvas { height: 320px; }
+  .fm-key-items { grid-template-columns: 1fr; }
+  .fm-legend-grid { grid-template-columns: 1fr; }
+}
+</style>
+</head>
+
+<body class="k" data-theme="fragment">
+
+<!-- ── Header ──────────────────────────────────────────────────── -->
+<header class="k-header">
+  <div class="k-header-inner">
+    <a href="/" class="k-tool-identity">
+      <svg class="k-tool-logo" viewBox="0 0 36 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <circle cx="8" cy="16" r="5" fill="var(--accent)"/>
+        <circle cx="24" cy="8" r="3.5" fill="var(--accent)" opacity="0.65"/>
+        <circle cx="26" cy="26" r="2.8" fill="var(--accent)" opacity="0.4"/>
+        <line x1="12.5" y1="14.5" x2="21" y2="9.5" stroke="var(--accent)" stroke-width="0.8" opacity="0.3"/>
+        <line x1="24.5" y1="11.2" x2="25.8" y2="23.5" stroke="var(--accent)" stroke-width="0.8" opacity="0.3"/>
+      </svg>
+      <span class="fm-wordmark"><span class="w-name">Fragment</span><span class="w-type">Mapper</span></span>
+    </a>
+    <div class="k-header-right">
+      <span class="k-header-user" id="user-name" style="display:none"></span>
+      <button class="k-btn-ghost" id="logout-btn" style="display:none;font-size:11px;color:var(--light3)" onclick="logout()">Log out</button>
+    </div>
+  </div>
+</header>
+
+
+<!-- ── Auth Gate ────────────────────────────────────────────────── -->
+<div class="k-gate" id="gate">
+  <div class="k-gate-card">
+    <div class="k-title">Fragment Mapper</div>
+    <p class="k-sub">See the structural relationships between your scattered text fragments.</p>
+    <form onsubmit="return register()">
+      <div class="k-form-group">
+        <label class="k-form-label" for="gate-name">Name</label>
+        <input type="text" class="k-form-input" id="gate-name" placeholder="Your name" required>
+      </div>
+      <div class="k-form-group">
+        <label class="k-form-label" for="gate-email">Email</label>
+        <input type="email" class="k-form-input" id="gate-email" placeholder="you@example.com" required>
+      </div>
+      <div id="gate-error" class="k-error" style="display:none"></div>
+      <div id="gate-notice" class="k-notice" style="display:none; margin-top:16px"></div>
+      <button type="submit" class="k-btn-primary" id="gate-btn" style="width:100%;margin-top:8px">Enter</button>
+    </form>
+  </div>
+</div>
+
+
+<!-- ── Main Application ────────────────────────────────────────── -->
+<div id="app" style="display:none">
+
+  <!-- Hero -->
+  <section class="fm-hero">
+    <div class="k-container">
+      <div class="fm-hero-title" role="heading" aria-level="1">
+        <span class="h-name">Fragment Mapper</span>
+        <span class="h-type">See the shape of scattered thinking</span>
+      </div>
+      <p class="fm-hero-sub">Write your fragments below, each separated by a blank line. The tool computes their structural relationships — where they cluster, where they diverge, where they echo.</p>
+      <div class="fm-hero-rule"></div>
+    </div>
+  </section>
+
+  <!-- Input -->
+  <section class="fm-input-section">
+    <div class="k-container">
+      <div class="fm-input-panel">
+        <label class="fm-input-label" for="fragments">Your fragments</label>
+        <textarea class="fm-textarea" id="fragments" rows="10"
+          placeholder="Separate fragments with a blank line. Each needs at least five words.
+
+The screen flattens what was meant to be spatial.
+It reduces everything to a single plane.
+
+Paper forces a different kind of attention.
+
+Students learn more from confusion than from clarity.
+The discomfort is where the learning lives."></textarea>
+        <div class="fm-input-foot">
+          <span class="fm-frag-count" id="frag-count">0 fragments</span>
+          <div class="fm-input-right">
+            <span class="fm-remaining" id="remaining"></span>
+            <button type="button" class="k-btn-primary" id="analyse-btn" disabled onclick="runAnalysis()" style="font-size:13px;padding:12px 24px">Map my fragments</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Results (appears first — narrative makes the map readable) -->
+  <section class="fm-results" id="results-section">
+    <div class="k-container">
+      <div class="k-card">
+
+        <!-- Results heading -->
+        <div class="fm-results-heading">
+          <div class="k-title" style="font-size:22px;margin-bottom:6px">What the rules found</div>
+          <p class="k-sub">The six rules examined your fragments for structural relationships. Here is what surfaced.</p>
+        </div>
+
+        <!-- Summary chips -->
+        <div class="fm-summary" id="summary-section"></div>
+
+        <!-- Narrative heading -->
+        <div class="fm-section-label" id="narrative-label" style="display:none">
+          <span class="k-lbl">Narrative</span>
+          <span class="fm-section-note">AI describes what the rules found. It cannot alter the counts or relationships.</span>
+        </div>
+
+        <!-- Narrative -->
+        <div class="k-narrative" id="narrative-section" style="display:none">
+          <div class="k-narrative-bar"></div>
+          <div class="k-narrative-body" id="narrative-body"></div>
+        </div>
+
+        <!-- Fragment list with tags (promoted from canvas — clearer than the map) -->
+        <div class="fm-fragment-list" id="fragment-list-section" style="display:none">
+          <div class="fm-section-label">
+            <span class="k-lbl">Your fragments</span>
+            <span class="fm-section-note">Each fragment with its structural tags.</span>
+          </div>
+          <div class="fm-echo-list" id="fragment-list-items"></div>
+        </div>
+
+        <!-- Behind the Curtain -->
+        <div class="k-curtain-row" id="curtain" role="button" tabindex="0" aria-expanded="false">
+          <span class="k-curtain-text">How was this decided?</span>
+          <span class="k-pill"><span class="k-pill-dot"></span></span>
+        </div>
+        <div class="k-pipeline" id="pipeline"></div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Canvas (after results — the map is a spatial companion, not the primary display) -->
+  <div class="fm-canvas-wrapper" id="canvas-wrapper" style="display:none">
+    <div class="fm-canvas-box">
+      <div class="fm-canvas-header">
+        <span class="fm-canvas-title">Fragment Map</span>
+        <span class="fm-canvas-sub">Position = topic similarity. Hover a node to see its relationships.</span>
+      </div>
+      <!-- Legend above canvas — read the vocabulary before the visual -->
+      <div class="fm-canvas-key" id="canvas-key" style="display:none">
+        <div class="fm-legend" id="canvas-legend"></div>
+      </div>
+      <div class="fm-canvas" id="canvas-container">
+        <div class="fm-canvas-loading" id="canvas-loading">
+          <div class="k-loading">
+            <div class="k-loading-label" id="loading-label">Analysing fragments</div>
+            <div class="k-loading-bar"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+
+<!-- ── Footer ──────────────────────────────────────────────────── -->
+<footer class="k-footer" style="padding:10px 24px">
+  <a href="https://koher.app" class="k-footer-mark">
+    <svg height="36" viewBox="0 0 200 220" xmlns="http://www.w3.org/2000/svg">
+      <path d="M 60 35 Q 100 65, 60 100 Q 20 135, 60 165" fill="none" stroke="#C75B39" stroke-width="18" stroke-linecap="round"/>
+      <path d="M 100 35 Q 60 65, 100 100 Q 140 135, 100 165" fill="none" stroke="#E8B86D" stroke-width="16" stroke-linecap="round"/>
+      <path d="M 140 35 Q 100 65, 140 100 Q 180 135, 140 165" fill="none" stroke="#9A8F85" stroke-width="14" stroke-linecap="round" opacity="0.6"/>
+      <text x="100" y="207" text-anchor="middle" font-family="'IBM Plex Sans', sans-serif" font-size="24" font-weight="500" letter-spacing="5" fill="#9A8F85">KOHER</text>
+    </svg>
+  </a>
+  <p class="k-footer-tagline">AI handles language. Code handles judgment.</p>
+  <a href="https://koher.app" class="k-footer-link">koher.app</a>
+</footer>
+
+
+<!-- ═══════════════════════════════════════════════════════════════
+     LOGIC
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+let currentUser = null;
+let analysisData = null;
+let p5Instance = null;
+let narrativeText = '';
+
+const gate = document.getElementById('gate');
+const app = document.getElementById('app');
+const fragInput = document.getElementById('fragments');
+const fragCount = document.getElementById('frag-count');
+const analyseBtn = document.getElementById('analyse-btn');
+const remaining = document.getElementById('remaining');
+
+
+/* ── Auth ──────────────────────────────────────────────────────── */
+
+let authEnabled = false;
+
+async function checkSession() {
+  try {
+    const res = await fetch('/auth/check', { credentials: 'same-origin' });
+    if (res.ok) {
+      currentUser = await res.json();
+      authEnabled = true;
+      showApp();
+    } else {
+      // Auth not enabled (open access mode) -- show app directly
+      authEnabled = false;
+      showApp();
+    }
+  } catch (e) {
+    // Server unreachable or auth endpoint missing -- show app in open mode
+    authEnabled = false;
+    showApp();
+  }
+}
+
+function showApp() {
+  gate.style.display = 'none';
+  app.style.display = '';
+
+  if (authEnabled && currentUser) {
+    const el = document.getElementById('user-name');
+    el.textContent = currentUser.name || currentUser.email;
+    el.style.display = '';
+    document.getElementById('logout-btn').style.display = '';
+    if (currentUser.remaining_analyses !== undefined) {
+      remaining.textContent = currentUser.remaining_analyses + ' left today';
+    }
+  }
+  // In open mode: no user name, no logout button, no remaining count
+}
+
+async function register() {
+  const name = document.getElementById('gate-name').value.trim();
+  const email = document.getElementById('gate-email').value.trim();
+  const errEl = document.getElementById('gate-error');
+  const noticeEl = document.getElementById('gate-notice');
+  const btn = document.getElementById('gate-btn');
+  if (!name || !email) return false;
+
+  errEl.style.display = 'none';
+  noticeEl.style.display = 'none';
+  btn.disabled = true;
+  btn.textContent = 'Registering...';
+
+  try {
+    const res = await fetch('/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ name, email })
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      errEl.innerHTML = '<strong>Error.</strong> ' + (data.detail || 'Registration failed.');
+      errEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Enter';
+      return false;
+    }
+
+    if (data.status === 'auto_verified' || data.status === 'already_verified') {
+      currentUser = { name: data.name || name, email, remaining_analyses: 10 };
+      showApp();
+    } else {
+      noticeEl.innerHTML = '<strong>Check your email.</strong> We sent a verification link to ' + email + '.';
+      noticeEl.style.display = '';
+      btn.disabled = false; btn.textContent = 'Enter';
+    }
+  } catch (err) {
+    errEl.innerHTML = '<strong>Connection failed.</strong> Unable to reach the server.';
+    errEl.style.display = '';
+    btn.disabled = false; btn.textContent = 'Enter';
+  }
+  return false;
+}
+
+async function logout() {
+  try { await fetch('/auth/logout', { method: 'POST', credentials: 'same-origin' }); } catch (e) {}
+  currentUser = null;
+  app.style.display = 'none';
+  gate.style.display = '';
+  document.getElementById('user-name').style.display = 'none';
+  document.getElementById('logout-btn').style.display = 'none';
+}
+
+
+/* ── Fragments ─────────────────────────────────────────────────── */
+
+function parseFragments() {
+  return fragInput.value.split(/\n\s*\n/)
+    .map(b => b.split('\n').map(l => l.trim()).filter(l => l).join(' ').trim())
+    .filter(t => t && t.split(/\s+/).filter(w => w).length >= 5);
+}
+
+function updateFragCount() {
+  const n = parseFragments().length;
+  fragCount.textContent = n + ' fragment' + (n !== 1 ? 's' : '');
+  fragCount.classList.toggle('valid', n >= 3);
+  analyseBtn.disabled = n < 3;
+}
+fragInput.addEventListener('input', updateFragCount);
+
+
+/* ── Utility ──────────────────────────────────────────────────── */
+
+function esc(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+function formatNarrative(text) {
+  function md(s) {
+    // Escape HTML first, then convert markdown
+    s = esc(s);
+    // Bold: **text** or __text__
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/__(.+?)__/g, '<strong>$1</strong>');
+    // Italic: *text* or _text_ (but not inside words)
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    s = s.replace(/(?<!\w)_(.+?)_(?!\w)/g, '<em>$1</em>');
+    // Quotes: "text"
+    s = s.replace(/&quot;(.+?)&quot;/g, '\u201c$1\u201d');
+    return s;
+  }
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim());
+  if (paragraphs.length <= 1) return '<p>' + md(text) + '</p>';
+  return paragraphs.map(p => '<p>' + md(p.trim()) + '</p>').join('');
+}
+
+
+/* ── Analysis (streaming SSE) ──────────────────────────────────── */
+
+async function runAnalysis() {
+  const frags = parseFragments();
+  if (frags.length < 3) return;
+
+  analyseBtn.disabled = true;
+  analyseBtn.textContent = 'Mapping...';
+  narrativeText = '';
+
+  // Reset everything
+  document.getElementById('canvas-wrapper').style.display = 'none';
+  document.getElementById('canvas-loading').style.display = '';
+  document.getElementById('canvas-key').style.display = 'none';
+
+  const resultsSection = document.getElementById('results-section');
+  resultsSection.style.display = 'block';
+  document.getElementById('summary-section').innerHTML = '';
+  document.getElementById('summary-section').style.display = 'none';
+  document.getElementById('narrative-body').innerHTML = '';
+  document.getElementById('narrative-section').style.display = 'none';
+  document.getElementById('narrative-label').style.display = 'none';
+  document.getElementById('fragment-list-section').style.display = 'none';
+
+  // Show loading state in the results card
+  const headingDiv = document.querySelector('.fm-results-heading');
+  headingDiv.style.borderBottom = 'none';
+  headingDiv.style.marginBottom = '0';
+  document.querySelector('.fm-results-heading .k-title').textContent = 'Analysing fragments...';
+  document.querySelector('.fm-results-heading .k-sub').innerHTML = '<div class="k-loading" style="margin-top:12px"><div class="k-loading-bar" style="background:transparent"></div></div>';
+  document.getElementById('pipeline').innerHTML = '';
+  document.getElementById('curtain').style.display = 'none';
+  document.getElementById('pipeline').classList.remove('open');
+
+  // If no response within 5s, show "waiting for a slot" message
+  const headingEl = document.querySelector('.fm-results-heading .k-title');
+  const queueTimer = setTimeout(() => {
+    headingEl.textContent = 'Waiting for an available slot...';
+  }, 5000);
+
+  try {
+    const res = await fetch('/api/analyse/stream', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({ fragments: frags })
+    });
+
+    clearTimeout(queueTimer);
+    headingEl.textContent = 'Analysing fragments...';
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      showAnalysisError(err.detail || 'Analysis failed (' + res.status + ')');
+      analyseBtn.disabled = false;
+      analyseBtn.textContent = 'Map my fragments';
+      return;
+    }
+
+    // Parse SSE stream
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let currentEvent = '';
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+
+      // Process complete lines
+      while (true) {
+        const nl = buffer.indexOf('\n');
+        if (nl === -1) break;
+        const line = buffer.substring(0, nl);
+        buffer = buffer.substring(nl + 1);
+
+        if (line.startsWith('event: ')) {
+          currentEvent = line.substring(7).trim();
+        } else if (line.startsWith('data: ')) {
+          try {
+            const data = JSON.parse(line.substring(6));
+            handleSSE(currentEvent, data, frags);
+          } catch (e) {
+            console.warn('SSE parse error:', e);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    clearTimeout(queueTimer);
+    showAnalysisError(err.message || 'Connection failed');
+  }
+
+  analyseBtn.disabled = false;
+  analyseBtn.textContent = 'Map my fragments';
+}
+
+
+function handleSSE(event, data, frags) {
+  switch (event) {
+    case 'analysis':
+      analysisData = data;
+
+      // Restore heading and show results
+      const headingDiv = document.querySelector('.fm-results-heading');
+      headingDiv.style.borderBottom = '';
+      headingDiv.style.marginBottom = '';
+      document.querySelector('.fm-results-heading .k-title').textContent = 'What the rules found';
+      document.querySelector('.fm-results-heading .k-sub').textContent = 'The six rules examined your fragments for structural relationships. Here is what surfaced.';
+      document.getElementById('results-section').style.display = 'block';
+      document.getElementById('curtain').style.display = '';
+      buildSummary(data);
+      buildPipeline(data);
+
+      // Build fragment list with tags (in results section)
+      buildCanvasKey(frags, data);
+
+      // Narrative section visible (streaming will fill it)
+      document.getElementById('narrative-label').style.display = 'flex';
+      document.getElementById('narrative-section').style.display = 'flex';
+      document.getElementById('narrative-body').innerHTML = '<span style="color:var(--ink3);font-style:italic;font-size:13px">Generating narrative...</span>';
+
+      // Canvas: hide loading, show legend + map
+      document.getElementById('canvas-wrapper').style.display = 'block';
+      document.getElementById('canvas-loading').style.display = 'none';
+      document.getElementById('canvas-key').style.display = 'block';
+
+      // p5.js canvas — slight delay to ensure container has dimensions
+      setTimeout(() => {
+        try {
+          initCanvas(data);
+        } catch (e) {
+          console.error('Canvas init error:', e);
+        }
+      }, 50);
+
+      break;
+
+    case 'remaining':
+      if (data.remaining_today !== undefined) {
+        remaining.textContent = data.remaining_today + ' left today';
+      }
+      break;
+
+    case 'narrative':
+      if (data.text) {
+        narrativeText += data.text;
+        document.getElementById('narrative-body').innerHTML = formatNarrative(narrativeText);
+      }
+      break;
+
+    case 'narrative_done':
+      break;
+
+    case 'narrative_unavailable':
+      document.getElementById('narrative-body').innerHTML = '<p style="font-style:italic;color:var(--ink3)">Narrative unavailable — API key not configured.</p>';
+      break;
+
+    case 'narrative_error':
+      document.getElementById('narrative-body').innerHTML = '<p style="color:#C75B39">Narrative generation failed.</p>';
+      break;
+  }
+}
+
+
+function showAnalysisError(msg) {
+  document.querySelector('.fm-results-heading .k-title').textContent = 'Something went wrong';
+  document.querySelector('.fm-results-heading .k-sub').textContent = '';
+  document.getElementById('results-section').style.display = 'block';
+  document.getElementById('narrative-label').style.display = 'flex';
+  document.getElementById('narrative-section').style.display = 'flex';
+  document.getElementById('narrative-body').innerHTML = '<p style="color:#C75B39">' + esc(msg) + '</p>';
+}
+
+
+/* ── Canvas key ────────────────────────────────────────────────── */
+
+function buildCanvasKey(frags, data) {
+  const strays = data.strays || [];
+  const shifts = data.shifts || [];
+
+  // Visual legend (now above canvas, read before the visual)
+  const items = [];
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#4A6FA5" opacity="0.7"/></svg>',
+    '<strong>Blue</strong> — negative or critical sentiment'
+  ));
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#D4A157" opacity="0.7"/></svg>',
+    '<strong>Amber</strong> — positive or affirming sentiment'
+  ));
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#8F8880" opacity="0.7"/></svg>',
+    '<strong>Grey</strong> — neutral sentiment'
+  ));
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#8F8880" opacity="0.7"/></svg>',
+    '<strong>Filled</strong> — has neighbours'
+  ));
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="none" stroke="#8F8880" stroke-width="2"/></svg>',
+    '<strong>Hollow</strong> — stray, drifts alone (a seed, not a problem)'
+  ));
+  items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="6" fill="#9A8F85" opacity="0.7" stroke="#9A8F85" stroke-width="2" stroke-dasharray="3 2"/></svg>',
+    '<strong>Dashed ring</strong> — shift: a markedly different voice <span class="fm-legend-note">(distinctive, not wrong)</span>'
+  ));
+  items.push(legendItem(
+    '<svg width="28" height="12"><line x1="0" y1="6" x2="28" y2="6" stroke="#9A8F85" stroke-width="2"/></svg>',
+    '<strong>Solid line</strong> — neighbours share a topic'
+  ));
+  items.push(legendItem(
+    '<svg width="28" height="12"><line x1="0" y1="6" x2="8" y2="6" stroke="#C75B39" stroke-width="2.5"/><line x1="13" y1="6" x2="21" y2="6" stroke="#C75B39" stroke-width="2.5"/></svg>',
+    '<strong>Dashed</strong> — rift: same topic, opposing pull <span class="fm-legend-note">(e.g. "I value freedom" vs "I need structure")</span>'
+  ));
+  items.push(legendItem(
+    '<svg width="28" height="12"><circle cx="3" cy="6" r="2" fill="#A0823B"/><circle cx="11" cy="6" r="2" fill="#A0823B"/><circle cx="19" cy="6" r="2" fill="#A0823B"/><circle cx="27" cy="6" r="2" fill="#A0823B"/></svg>',
+    '<strong>Dotted</strong> — fork: same topic, different words <span class="fm-legend-note">(e.g. "I value freedom" vs "autonomy matters")</span>'
+  ));
+  items.push(legendItem(
+    '<svg width="28" height="12"><line x1="0" y1="6" x2="28" y2="6" stroke="#788CA0" stroke-width="1" opacity="0.5" stroke-dasharray="1 3"/></svg>',
+    '<strong>Faint line</strong> — echo: different topics, same voice <span class="fm-legend-note">(unconscious pattern)</span>'
+  ));
+
+  document.getElementById('canvas-legend').innerHTML =
+    '<div class="fm-legend-grid">' + items.join('') + '</div>';
+
+  // Fragment list (now in results section, promoted as primary display)
+  document.getElementById('fragment-list-items').innerHTML = frags.map((f, i) => {
+    const roles = [];
+    if (strays.includes(i)) roles.push('<span style="color:#C75B39">stray</span>');
+    if (shifts.includes(i)) roles.push('<span style="color:#E8B86D">shift</span>');
+    for (const group of (data.neighbours || [])) {
+      if (group.includes(i)) { roles.push('<span style="color:var(--ink2)">neighbour</span>'); break; }
+    }
+    for (const r of (data.rifts || [])) {
+      if (r.pair.includes(i)) { roles.push('<span style="color:#C75B39">rift</span>'); break; }
+    }
+    for (const f2 of (data.forks || [])) {
+      if (f2.pair.includes(i)) { roles.push('<span style="color:#A0823B">fork</span>'); break; }
+    }
+    for (const e of (data.echoes || [])) {
+      if (e.pair.includes(i)) { roles.push('<span style="color:#788CA0">echo</span>'); break; }
+    }
+    const badge = roles.length ? ' <span style="font-size:11px;font-style:normal">(' + roles.join(', ') + ')</span>' : '';
+    return '<div class="fm-echo-item">' +
+      '<span class="fm-echo-num">' + (i + 1) + '</span>' +
+      '<span class="fm-echo-text">' + esc(f) + badge + '</span>' +
+    '</div>';
+  }).join('');
+  document.getElementById('fragment-list-section').style.display = 'block';
+}
+
+function legendItem(icon, text) {
+  return '<div class="fm-legend-item">' +
+    '<span class="fm-legend-icon">' + icon + '</span>' +
+    '<span class="fm-legend-text">' + text + '</span>' +
+  '</div>';
+}
+
+
+/* ── Summary chips ─────────────────────────────────────────────── */
+
+function buildSummary(data) {
+  document.getElementById('summary-section').style.display = '';
+  const c = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const rules = [
+    ['neighbours', c(data.neighbours)],
+    ['strays', c(data.strays)],
+    ['rifts', c(data.rifts)],
+    ['forks', c(data.forks)],
+    ['echoes', c(data.echoes)],
+    ['shifts', c(data.shifts)],
+  ];
+
+  const active = rules.filter(([_, n]) => n > 0).length;
+
+  document.getElementById('summary-section').innerHTML =
+    '<div class="fm-summary-label">' + data.fragment_count + ' fragments — ' + active + ' of 6 rules active</div>' +
+    '<div class="k-chips">' +
+    rules.map(([name, count]) =>
+      '<span class="k-chip' + (count > 0 ? ' k-chip-accent' : '') + '">' + name + ': ' + count + '</span>'
+    ).join('') +
+    '</div>';
+}
+
+
+/* ── Pipeline (Behind the Curtain) ─────────────────────────────── */
+
+function buildPipeline(data) {
+  const c = (arr) => Array.isArray(arr) ? arr.length : 0;
+  document.getElementById('pipeline').innerHTML =
+    '<div class="k-pipeline-head">What happened inside</div>' +
+    '<div class="k-layer">' +
+      '<div class="k-layer-mark">Q</div>' +
+      '<div class="k-layer-body">' +
+        '<div class="k-layer-name">Qualification — four signals extracted</div>' +
+        '<div class="k-layer-desc">Each fragment was measured in four ways. No judgment yet — just measurement.</div>' +
+        '<div class="k-chips">' +
+          '<span class="k-chip" title="Sentence embedding via all-MiniLM-L6-v2">meaning similarity</span>' +
+          '<span class="k-chip" title="TF-IDF via scikit-learn">vocabulary distinctiveness</span>' +
+          '<span class="k-chip" title="VADER sentiment analysis">emotional temperature</span>' +
+          '<span class="k-chip" title="Pure Python lexical analysis">writing character</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="k-layer">' +
+      '<div class="k-layer-mark">R</div>' +
+      '<div class="k-layer-body">' +
+        '<div class="k-layer-name">Rules — six deterministic rules applied</div>' +
+        '<div class="k-layer-desc">Same fragments always produce the same findings. No AI in this stage.</div>' +
+        '<div class="k-chips">' +
+          '<span class="k-chip' + (c(data.neighbours) ? ' k-chip-accent' : '') + '">neighbours: ' + c(data.neighbours) + '</span>' +
+          '<span class="k-chip' + (c(data.strays) ? ' k-chip-accent' : '') + '">strays: ' + c(data.strays) + '</span>' +
+          '<span class="k-chip' + (c(data.rifts) ? ' k-chip-accent' : '') + '">rifts: ' + c(data.rifts) + '</span>' +
+          '<span class="k-chip' + (c(data.forks) ? ' k-chip-accent' : '') + '">forks: ' + c(data.forks) + '</span>' +
+          '<span class="k-chip' + (c(data.echoes) ? ' k-chip-accent' : '') + '">echoes: ' + c(data.echoes) + '</span>' +
+          '<span class="k-chip' + (c(data.shifts) ? ' k-chip-accent' : '') + '">shifts: ' + c(data.shifts) + '</span>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="k-layer">' +
+      '<div class="k-layer-mark">L</div>' +
+      '<div class="k-layer-body">' +
+        '<div class="k-layer-name">Language — AI narrated the findings</div>' +
+        '<div class="k-layer-desc">Described the map in plain language. Cannot change the judgments.</div>' +
+        '<div class="k-chips"><span class="k-chip" title="Claude Haiku 4.5 via OpenRouter">AI narration</span></div>' +
+      '</div>' +
+    '</div>';
+}
+
+
+/* ── Curtain toggle ────────────────────────────────────────────── */
+
+const curtain = document.getElementById('curtain');
+const pipelineEl = document.getElementById('pipeline');
+curtain.addEventListener('click', () => {
+  const open = curtain.getAttribute('aria-expanded') === 'true';
+  curtain.setAttribute('aria-expanded', String(!open));
+  pipelineEl.classList.toggle('open', !open);
+});
+curtain.addEventListener('keydown', e => {
+  if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); curtain.click(); }
+});
+
+
+/* ── p5.js canvas ──────────────────────────────────────────────── */
+
+function initCanvas(data) {
+  if (p5Instance) { p5Instance.remove(); p5Instance = null; }
+  const container = document.getElementById('canvas-container');
+  if (container.clientWidth === 0 || container.clientHeight === 0) return;
+
+  // Pre-compute rule memberships for each fragment
+  const n = data.fragment_count;
+  const straySet = new Set(data.strays || []);
+  const shiftSet = new Set(data.shifts || []);
+  const neighbourOf = new Map();
+  for (const group of (data.neighbours || [])) {
+    for (const idx of group) neighbourOf.set(idx, group);
+  }
+  const riftPairs = (data.rifts || []).map(r => r.pair);
+  const forkPairs = (data.forks || []).map(f => f.pair);
+  const echoPairs = (data.echoes || []).map(e => e.pair);
+
+  // Build adjacency: which nodes are connected to which, and by what relationship
+  function getConnected(idx) {
+    const connected = new Set();
+    if (neighbourOf.has(idx)) { for (const j of neighbourOf.get(idx)) connected.add(j); }
+    for (const [a,b] of riftPairs) { if (a === idx) connected.add(b); if (b === idx) connected.add(a); }
+    for (const [a,b] of forkPairs) { if (a === idx) connected.add(b); if (b === idx) connected.add(a); }
+    for (const [a,b] of echoPairs) { if (a === idx) connected.add(b); if (b === idx) connected.add(a); }
+    connected.delete(idx);
+    return connected;
+  }
+
+  p5Instance = new p5((p) => {
+    const nodes = [];
+    const BG = [30, 37, 35];
+    let hoveredNode = -1;
+
+    p.setup = () => {
+      p.createCanvas(container.clientWidth, container.clientHeight);
+      const sim = data.similarity_matrix || [];
+      const sent = data.sentiment || [];
+      const dist = data.distinctiveness || [];
+      const maxDist = dist.length > 0 ? Math.max(...dist, 0.01) : 1;
+
+      // Force-directed base positions
+      const pos = [];
+      const w = p.width, h = p.height, pad = 60;
+      for (let i = 0; i < n; i++) {
+        pos.push({ x: pad + Math.random() * (w - pad*2), y: pad + Math.random() * (h - pad*2) });
+      }
+      for (let iter = 0; iter < 250; iter++) {
+        for (let i = 0; i < n; i++) {
+          let fx = 0, fy = 0;
+          for (let j = 0; j < n; j++) {
+            if (i === j) continue;
+            const dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y;
+            const d = Math.max(Math.sqrt(dx*dx + dy*dy), 1);
+            fx += (dx/d) * 800 / (d*d);
+            fy += (dy/d) * 800 / (d*d);
+            const s = (sim[i] && sim[i][j] !== undefined) ? sim[i][j] : 0;
+            if (s > 0.1) { fx -= (dx/d) * s * d * 0.004; fy -= (dy/d) * s * d * 0.004; }
+          }
+          fx += (w/2 - pos[i].x) * 0.006;
+          fy += (h/2 - pos[i].y) * 0.006;
+          pos[i].x = Math.max(pad, Math.min(w-pad, pos[i].x + Math.max(-4, Math.min(4, fx))));
+          pos[i].y = Math.max(pad, Math.min(h-pad, pos[i].y + Math.max(-4, Math.min(4, fy))));
+        }
+      }
+
+      // Centre
+      let cx = 0, cy = 0;
+      for (let i = 0; i < n; i++) { cx += pos[i].x; cy += pos[i].y; }
+      cx /= n; cy /= n;
+      for (let i = 0; i < n; i++) {
+        pos[i].x = Math.max(pad, Math.min(w-pad, pos[i].x + w/2 - cx));
+        pos[i].y = Math.max(pad, Math.min(h-pad, pos[i].y + h/2 - cy));
+      }
+
+      for (let i = 0; i < n; i++) {
+        const compound = sent[i] ? sent[i].compound : 0;
+        const normDist = dist[i] ? dist[i] / maxDist : 0.5;
+        const t = (compound + 1) / 2;
+
+        nodes.push({
+          x: pos[i].x, y: pos[i].y,
+          r: p.lerp(18, 32, normDist),
+          col: [p.lerp(74,212,t), p.lerp(111,161,t), p.lerp(165,87,t)],
+          opacity: 0, target: 0.8,
+          fadeStart: i * 80,
+          label: String(i + 1),
+          isStray: straySet.has(i),
+          isShift: shiftSet.has(i),
+        });
+      }
+    };
+
+    p.draw = () => {
+      p.background(BG[0], BG[1], BG[2]);
+      hoveredNode = -1;
+
+      // Hover detection pass (before drawing, so we know what to highlight)
+      for (let i = 0; i < nodes.length; i++) {
+        const nd = nodes[i];
+        const hdx = p.mouseX - nd.x, hdy = p.mouseY - nd.y;
+        if (Math.sqrt(hdx*hdx + hdy*hdy) < nd.r + 6) hoveredNode = i;
+      }
+
+      // Which nodes are connected to the hovered node?
+      const highlightSet = hoveredNode >= 0 ? getConnected(hoveredNode) : null;
+      const dimming = hoveredNode >= 0; // are we dimming non-connected nodes?
+
+      // ── Draw edges ──
+
+      // Neighbour connections: solid lines
+      for (const group of (data.neighbours || [])) {
+        for (let a = 0; a < group.length; a++) {
+          for (let b = a + 1; b < group.length; b++) {
+            const ia = group[a], ib = group[b];
+            const na = nodes[ia], nb = nodes[ib];
+            if (na.opacity > 0.1 && nb.opacity > 0.1) {
+              const edgeActive = !dimming || (hoveredNode === ia || hoveredNode === ib);
+              const alpha = Math.min(na.opacity, nb.opacity) * (edgeActive ? 120 : 25);
+              p.stroke(na.col[0], na.col[1], na.col[2], alpha);
+              p.strokeWeight(edgeActive ? 2 : 1);
+              p.line(na.x, na.y, nb.x, nb.y);
+            }
+          }
+        }
+      }
+
+      // Rift lines: dashed, terracotta — wider dashes for visibility
+      for (const [a, b] of riftPairs) {
+        const na = nodes[a], nb = nodes[b];
+        if (na && nb && na.opacity > 0.1 && nb.opacity > 0.1) {
+          const edgeActive = !dimming || (hoveredNode === a || hoveredNode === b);
+          const alpha = Math.min(na.opacity, nb.opacity) * (edgeActive ? 160 : 30);
+          p.stroke(199, 91, 57, alpha);
+          p.strokeWeight(edgeActive ? 2.5 : 1.5);
+          // Wider dashes: 4 segments with gaps
+          for (let s = 0; s < 6; s += 2) {
+            const t1 = s/6, t2 = (s+1.2)/6;
+            p.line(p.lerp(na.x,nb.x,t1), p.lerp(na.y,nb.y,t1), p.lerp(na.x,nb.x,t2), p.lerp(na.y,nb.y,t2));
+          }
+        }
+      }
+
+      // Fork lines: dotted (actual dots), gold
+      for (const [a, b] of forkPairs) {
+        const na = nodes[a], nb = nodes[b];
+        if (na && nb && na.opacity > 0.1 && nb.opacity > 0.1) {
+          const edgeActive = !dimming || (hoveredNode === a || hoveredNode === b);
+          const alpha = Math.min(na.opacity, nb.opacity) * (edgeActive ? 140 : 30);
+          p.noStroke();
+          p.fill(160, 130, 59, alpha);
+          const dx = nb.x - na.x, dy = nb.y - na.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          const dotR = edgeActive ? 2.5 : 1.8;
+          const spacing = 10;
+          const count = Math.floor(d / spacing);
+          for (let s = 1; s < count; s++) {
+            const t1 = s / count;
+            p.circle(p.lerp(na.x, nb.x, t1), p.lerp(na.y, nb.y, t1), dotR * 2);
+          }
+        }
+      }
+
+      // Echo lines: faint dashed, bluish
+      for (const [a, b] of echoPairs) {
+        const na = nodes[a], nb = nodes[b];
+        if (na && nb && na.opacity > 0.1 && nb.opacity > 0.1) {
+          const edgeActive = !dimming || (hoveredNode === a || hoveredNode === b);
+          const alpha = edgeActive ? 70 : 15;
+          p.stroke(120, 140, 160, alpha);
+          p.strokeWeight(edgeActive ? 1.2 : 0.7);
+          // Short dash pattern
+          const dx = nb.x - na.x, dy = nb.y - na.y;
+          const d = Math.sqrt(dx*dx + dy*dy);
+          const segments = Math.max(Math.floor(d / 6), 2);
+          for (let s = 0; s < segments; s += 2) {
+            const t1 = s/segments, t2 = (s+1)/segments;
+            p.line(p.lerp(na.x,nb.x,t1), p.lerp(na.y,nb.y,t1), p.lerp(na.x,nb.x,t2), p.lerp(na.y,nb.y,t2));
+          }
+        }
+      }
+
+      // ── Draw nodes (settle-then-still: no position animation, just fade-in) ──
+
+      for (let i = 0; i < nodes.length; i++) {
+        const nd = nodes[i];
+        if (p.millis() > nd.fadeStart) nd.opacity = p.min(nd.opacity + 0.02, nd.target);
+
+        // Dimming: nodes not connected to hovered node are dimmed
+        const isActive = !dimming || i === hoveredNode || (highlightSet && highlightSet.has(i));
+        const alphaMultiplier = isActive ? 1.0 : 0.25;
+        const alpha = nd.opacity * 255 * alphaMultiplier;
+        const drawR = nd.r;
+
+        p.noStroke();
+        if (nd.isStray) {
+          // Strays: ring only
+          p.noFill();
+          p.stroke(nd.col[0], nd.col[1], nd.col[2], alpha);
+          p.strokeWeight(2);
+          p.circle(nd.x, nd.y, drawR * 2);
+        } else if (nd.isShift) {
+          // Shifts: filled with dashed ring (static marker instead of jitter)
+          p.fill(nd.col[0], nd.col[1], nd.col[2], alpha);
+          p.circle(nd.x, nd.y, drawR * 2);
+          p.noFill();
+          p.stroke(nd.col[0], nd.col[1], nd.col[2], alpha * 0.5);
+          p.strokeWeight(1.5);
+          // Draw a dashed outer ring using arc segments
+          for (let a = 0; a < 8; a++) {
+            const a1 = (a * p.TWO_PI / 8);
+            const a2 = a1 + (p.TWO_PI / 16);
+            p.arc(nd.x, nd.y, drawR * 2 + 8, drawR * 2 + 8, a1, a2);
+          }
+        } else {
+          p.fill(nd.col[0], nd.col[1], nd.col[2], alpha);
+          p.circle(nd.x, nd.y, drawR * 2);
+        }
+
+        // Number label
+        if (nd.opacity > 0.2) {
+          p.noStroke();
+          const labelAlpha = alpha * 0.95;
+          p.fill(nd.isStray ? 200 : 30, nd.isStray ? 200 : 30, nd.isStray ? 200 : 30, labelAlpha);
+          p.textSize(15);
+          p.textAlign(p.CENTER, p.CENTER);
+          p.text(nd.label, nd.x, nd.y + 1);
+        }
+      }
+
+      // ── Hover tooltip ──
+      if (hoveredNode >= 0) {
+        const nd = nodes[hoveredNode];
+        const frag = data.fragments[hoveredNode];
+        if (frag) {
+          const preview = frag.length > 100 ? frag.substring(0, 100) + '...' : frag;
+          const roles = [];
+          if (nd.isStray) roles.push('stray');
+          if (nd.isShift) roles.push('shift');
+          if (neighbourOf.has(hoveredNode)) roles.push('neighbour');
+          for (const [a,b] of riftPairs) { if (a === hoveredNode || b === hoveredNode) { roles.push('rift'); break; } }
+          for (const [a,b] of forkPairs) { if (a === hoveredNode || b === hoveredNode) { roles.push('fork'); break; } }
+          for (const [a,b] of echoPairs) { if (a === hoveredNode || b === hoveredNode) { roles.push('echo'); break; } }
+
+          p.textSize(12);
+          const maxW = 240;
+          const words = preview.split(' ');
+          const lines = []; let line = '';
+          for (const w of words) {
+            const test = line ? line + ' ' + w : w;
+            if (p.textWidth(test) > maxW && line) { lines.push(line); line = w; }
+            else line = test;
+          }
+          if (line) lines.push(line);
+
+          const lineH = 17;
+          const padX = 14, padY = 10;
+          const header = 'Fragment ' + nd.label + (roles.length ? '  (' + roles.join(', ') + ')' : '');
+          const boxW = maxW + padX*2;
+          const boxH = lines.length * lineH + padY*2 + 16;
+          const tx = Math.min(nd.x + nd.r + 12, p.width - boxW - 10);
+          const ty = Math.max(nd.y - boxH/2, 10);
+
+          p.fill(45, 49, 39, 240);
+          p.noStroke();
+          p.rect(tx, ty, boxW, boxH, 6);
+
+          p.fill(154, 143, 133);
+          p.textSize(10);
+          p.textAlign(p.LEFT, p.TOP);
+          p.text(header, tx + padX, ty + padY);
+
+          p.fill(247, 243, 237);
+          p.textSize(12);
+          for (let l = 0; l < lines.length; l++) {
+            p.text(lines[l], tx + padX, ty + padY + 15 + l * lineH);
+          }
+        }
+      }
+
+      p.cursor(hoveredNode >= 0 ? p.HAND : p.ARROW);
+
+      // Stop the draw loop once all nodes have faded in (no continuous animation needed)
+      const allFaded = nodes.every(nd => nd.opacity >= nd.target);
+      if (allFaded && hoveredNode < 0) p.noLoop();
+    };
+
+    // Resume loop on mouse movement (for hover interaction)
+    p.mouseMoved = () => p.loop();
+    p.mouseEntered = () => p.loop();
+
+    p.windowResized = () => { p.resizeCanvas(container.clientWidth, container.clientHeight); p.loop(); };
+  }, container);
+}
+
+
+/* ── Init ──────────────────────────────────────────────────────── */
+checkSession();
+</script>
+</body>
+</html>
