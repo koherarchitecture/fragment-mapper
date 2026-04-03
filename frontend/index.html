@@ -834,6 +834,10 @@ function handleSSE(event, data, frags) {
       document.querySelector('.fm-results-heading .k-sub').textContent = 'The six rules examined your fragments for structural relationships. Here is what surfaced.';
       document.getElementById('results-section').style.display = 'block';
       document.getElementById('curtain').style.display = '';
+
+      // Hide input form and hero — results are the focus now
+      document.querySelector('.fm-hero').style.display = 'none';
+      document.querySelector('.fm-input-section').style.display = 'none';
       buildSummary(data);
       buildGlossary(data);
       buildPipeline(data);
