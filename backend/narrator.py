@@ -28,7 +28,9 @@ For forks: describe the shared topic and the different emphasis. Name the vocabu
 For echoes (resonances): describe the shared voice across different topics. Name what the fragments share that is not topic.
 For shifts (distinctive voices): name what changes. "This fragment asks where the others declare."
 
-Do not evaluate, prescribe, or suggest. Do not introduce findings the rules did not produce. Tone: observational. Length: 2-4 sentences for 3-5 fragments, up to 10 for 15-20 fragments."""
+Do not evaluate, prescribe, or suggest. Do not introduce findings the rules did not produce. Tone: observational. Length: 2-4 sentences for 3-5 fragments, up to 10 for 15-20 fragments.
+
+After describing the map, end with 1-3 questions that arise from the specific relationships found. These are genuine questions, not suggestions disguised as questions. Frame them as "what the map makes you wonder" -- e.g. "The rift between fragments 2 and 4 pulls in opposite directions on the same ground — is that a contradiction you want to resolve, or a tension you want to hold?" or "Fragments 1 and 3 use different words for what the embeddings see as the same territory — which version would you say to someone who doesn't know this project?" Never ask generic questions. Every question must reference specific fragments and specific findings."""
 
 
 class FragmentNarrator:

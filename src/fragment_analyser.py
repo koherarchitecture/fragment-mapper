@@ -467,22 +467,49 @@ def find_forks(
     """
     Find fork pairs: high embedding similarity (same topic) but low
     TF-IDF similarity (different emphasis/vocabulary).
+
+    Context-aware: when all fragments are about the same topic (mean
+    embedding similarity is high), the fork threshold adapts to only
+    flag the strongest TF-IDF divergences, preventing every pair from
+    being classified as a fork.
     """
     n = similarity_matrix.shape[0]
     forks = []
+
+    # Compute mean off-diagonal embedding similarity to detect
+    # single-topic fragment sets (e.g. all about the same game/project)
+    off_diag = []
+    for i in range(n):
+        for j in range(i + 1, n):
+            off_diag.append(float(similarity_matrix[i, j]))
+    mean_embed_sim = np.mean(off_diag) if off_diag else 0.0
+
+    # Adaptive threshold: when mean similarity is high (>0.40),
+    # require a larger fork magnitude to avoid flooding
+    if mean_embed_sim > FORK_EMBED_THRESHOLD:
+        # Raise TF-IDF threshold — only flag pairs with very low
+        # vocabulary overlap when everything is topically close
+        adaptive_tfidf = FORK_TFIDF_THRESHOLD * 0.6  # stricter: 0.09 instead of 0.15
+        # Also require higher fork magnitude
+        min_fork_magnitude = 0.35
+    else:
+        adaptive_tfidf = FORK_TFIDF_THRESHOLD
+        min_fork_magnitude = 0.0
 
     for i in range(n):
         for j in range(i + 1, n):
             embed_sim = float(similarity_matrix[i, j])
             tfidf_sim = tfidf_similarity[i][j]
 
-            if embed_sim >= FORK_EMBED_THRESHOLD and tfidf_sim <= FORK_TFIDF_THRESHOLD:
-                forks.append({
-                    "pair": [i, j],
-                    "embedding_sim": round(embed_sim, 4),
-                    "tfidf_sim": round(tfidf_sim, 4),
-                    "fork_magnitude": round(embed_sim - tfidf_sim, 4),
-                })
+            if embed_sim >= FORK_EMBED_THRESHOLD and tfidf_sim <= adaptive_tfidf:
+                magnitude = embed_sim - tfidf_sim
+                if magnitude >= min_fork_magnitude:
+                    forks.append({
+                        "pair": [i, j],
+                        "embedding_sim": round(embed_sim, 4),
+                        "tfidf_sim": round(tfidf_sim, 4),
+                        "fork_magnitude": round(magnitude, 4),
+                    })
 
     return forks
 

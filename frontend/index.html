@@ -218,6 +218,39 @@
   font-size: 11px;
 }
 
+/* Glossary */
+.fm-glossary {
+  margin-top: 16px;
+}
+.fm-glossary-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin-top: 8px;
+}
+.fm-glossary-item {
+  display: flex;
+  gap: 10px;
+  padding: 10px 14px;
+  background: var(--surface-inner);
+  border-radius: 6px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  font-family: var(--font-body);
+  color: var(--ink2);
+}
+.fm-glossary-label {
+  font-family: var(--font-sans);
+  font-weight: 500;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--ink);
+  white-space: nowrap;
+  min-width: 80px;
+  padding-top: 2px;
+}
+
 /* Key (fragment labels below canvas) */
 .fm-canvas-key {
   padding: 18px 24px;
@@ -481,6 +514,14 @@ The discomfort is where the learning lives."></textarea>
           <div class="k-narrative-body" id="narrative-body"></div>
         </div>
 
+        <!-- Rule glossary (explains what each relationship means) -->
+        <div class="fm-glossary" id="glossary-section" style="display:none">
+          <div class="fm-section-label">
+            <span class="k-lbl">What these relationships mean</span>
+          </div>
+          <div class="fm-glossary-grid" id="glossary-items"></div>
+        </div>
+
         <!-- Fragment list with tags (promoted from canvas — clearer than the map) -->
         <div class="fm-fragment-list" id="fragment-list-section" style="display:none">
           <div class="fm-section-label">
@@ -560,41 +601,23 @@ const remaining = document.getElementById('remaining');
 
 /* ── Auth ──────────────────────────────────────────────────────── */
 
-let authEnabled = false;
-
 async function checkSession() {
   try {
     const res = await fetch('/auth/check', { credentials: 'same-origin' });
-    if (res.ok) {
-      currentUser = await res.json();
-      authEnabled = true;
-      showApp();
-    } else {
-      // Auth not enabled (open access mode) -- show app directly
-      authEnabled = false;
-      showApp();
-    }
-  } catch (e) {
-    // Server unreachable or auth endpoint missing -- show app in open mode
-    authEnabled = false;
-    showApp();
-  }
+    if (res.ok) { currentUser = await res.json(); showApp(); }
+  } catch (e) {}
 }
 
 function showApp() {
   gate.style.display = 'none';
   app.style.display = '';
-
-  if (authEnabled && currentUser) {
-    const el = document.getElementById('user-name');
-    el.textContent = currentUser.name || currentUser.email;
-    el.style.display = '';
-    document.getElementById('logout-btn').style.display = '';
-    if (currentUser.remaining_analyses !== undefined) {
-      remaining.textContent = currentUser.remaining_analyses + ' left today';
-    }
+  const el = document.getElementById('user-name');
+  el.textContent = currentUser.name || currentUser.email;
+  el.style.display = '';
+  document.getElementById('logout-btn').style.display = '';
+  if (currentUser.remaining_analyses !== undefined) {
+    remaining.textContent = currentUser.remaining_analyses + ' left today';
   }
-  // In open mode: no user name, no logout button, no remaining count
 }
 
 async function register() {
@@ -720,6 +743,7 @@ async function runAnalysis() {
   document.getElementById('narrative-section').style.display = 'none';
   document.getElementById('narrative-label').style.display = 'none';
   document.getElementById('fragment-list-section').style.display = 'none';
+  document.getElementById('glossary-section').style.display = 'none';
 
   // Show loading state in the results card
   const headingDiv = document.querySelector('.fm-results-heading');
@@ -811,6 +835,7 @@ function handleSSE(event, data, frags) {
       document.getElementById('results-section').style.display = 'block';
       document.getElementById('curtain').style.display = '';
       buildSummary(data);
+      buildGlossary(data);
       buildPipeline(data);
 
       // Build fragment list with tags (in results section)
@@ -986,6 +1011,35 @@ function buildSummary(data) {
 }
 
 
+/* ── Glossary (rule explanations) ──────────────────────────────── */
+
+function buildGlossary(data) {
+  const c = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const defs = [
+    ['Neighbours', c(data.neighbours), 'Fragments that share enough vocabulary and meaning to form a group. They orbit the same territory — different angles on the same idea.'],
+    ['Strays', c(data.strays), 'Fragments that sit apart from everything else. They share little vocabulary or meaning with any other fragment. Not a problem — a stray might be a seed that nothing else has grown around yet.'],
+    ['Rifts', c(data.rifts), 'Two fragments about the same topic that pull in opposite emotional directions. The words overlap but the feeling diverges — one affirms where the other resists.'],
+    ['Forks', c(data.forks), 'Two fragments about the same idea expressed in notably different vocabulary. The meaning is close but the language has diverged — you might be developing two separate framings for the same thing.'],
+    ['Echoes', c(data.echoes), 'Fragments about different topics that share the same voice — similar emotional tone, similar writing patterns. An unconscious thread connecting otherwise separate ideas.'],
+    ['Shifts', c(data.shifts), 'A fragment written in a markedly different voice from the rest — shorter or longer sentences, more questions, more hedging. The change in register is distinctive, not wrong.'],
+  ];
+
+  const active = defs.filter(([_, n]) => n > 0);
+  if (active.length === 0) {
+    document.getElementById('glossary-section').style.display = 'none';
+    return;
+  }
+
+  document.getElementById('glossary-section').style.display = '';
+  document.getElementById('glossary-items').innerHTML = active.map(([name, count, desc]) =>
+    '<div class="fm-glossary-item">' +
+    '<span class="fm-glossary-label">' + name + ' (' + count + ')</span>' +
+    '<span>' + desc + '</span>' +
+    '</div>'
+  ).join('');
+}
+
+
 /* ── Pipeline (Behind the Curtain) ─────────────────────────────── */
 
 function buildPipeline(data) {
@@ -1100,8 +1154,8 @@ function initCanvas(data) {
             if (i === j) continue;
             const dx = pos[i].x - pos[j].x, dy = pos[i].y - pos[j].y;
             const d = Math.max(Math.sqrt(dx*dx + dy*dy), 1);
-            fx += (dx/d) * 800 / (d*d);
-            fy += (dy/d) * 800 / (d*d);
+            fx += (dx/d) * 2000 / (d*d);
+            fy += (dy/d) * 2000 / (d*d);
             const s = (sim[i] && sim[i][j] !== undefined) ? sim[i][j] : 0;
             if (s > 0.1) { fx -= (dx/d) * s * d * 0.004; fy -= (dy/d) * s * d * 0.004; }
           }
