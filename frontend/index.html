@@ -247,8 +247,10 @@
   letter-spacing: 0.08em;
   color: var(--ink);
   white-space: nowrap;
-  min-width: 80px;
+  min-width: 140px;
+  flex-shrink: 0;
   padding-top: 2px;
+  padding-right: 8px;
 }
 
 /* Key (fragment labels below canvas) */
@@ -286,7 +288,7 @@
 
 /* Results */
 .fm-results {
-  padding: 40px 24px 80px;
+  padding: 40px 24px 24px;
   display: none;
 }
 
@@ -383,6 +385,202 @@ a.k-chip:hover { border-color: var(--accent); text-decoration: none; }
   text-transform: uppercase;
   color: var(--accent);
   margin-top: 2px;
+}
+
+
+/* ── Findings (per-finding cards with clarify) ──────────────────── */
+
+.fm-findings {
+  margin-top: 8px;
+}
+.fm-finding {
+  padding: 16px 0;
+  border-bottom: 1px solid #E4DDD5;
+}
+.fm-finding:last-child { border-bottom: none; }
+
+.fm-finding-header {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+.fm-finding-type {
+  font-family: var(--font-label);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 3px;
+  background: var(--accent-bg, rgba(74, 111, 165, 0.12));
+  color: var(--accent);
+  flex-shrink: 0;
+}
+.fm-finding-fragments {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--ink3);
+}
+
+.fm-finding-desc {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink2);
+  margin-bottom: 6px;
+}
+.fm-finding-quotes {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--ink3);
+  margin-bottom: 10px;
+  padding-left: 12px;
+  border-left: 2px solid #E4DDD5;
+}
+
+.fm-finding-narrative {
+  font-family: var(--font-body);
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.fm-finding-revised-label {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 4px;
+}
+
+.fm-score-deltas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+}
+
+.fm-delta-item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 3.5px;
+  background: rgba(139, 110, 78, 0.08);
+  color: var(--ink3);
+}
+
+.fm-delta-significant {
+  background: rgba(61, 122, 74, 0.12);
+  color: var(--state-solid);
+}
+
+.fm-delta-minor {
+  background: rgba(216, 208, 200, 0.5);
+  color: var(--ink3);
+}
+
+/* I disagree button */
+.fm-disagree-btn {
+  font-family: var(--font-label);
+  font-size: 9px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--ink3);
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  opacity: 0.5;
+  transition: color 0.2s, border-color 0.2s;
+}
+.fm-disagree-btn:hover {
+  color: var(--accent);
+  opacity: 1;
+}
+.fm-disagree-btn:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+.fm-disagree-btn.clarified {
+  color: var(--accent);
+  cursor: default;
+  opacity: 0.5;
+  font-style: italic;
+}
+
+/* Clarify form (appears when I disagree is clicked) */
+.fm-clarify-form {
+  margin-top: 12px;
+  padding: 14px;
+  background: var(--surface-inner, #F0EBE3);
+  border-radius: 6px;
+  display: none;
+}
+.fm-clarify-form.open { display: block; }
+
+.fm-clarify-question {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--ink2);
+  margin-bottom: 10px;
+}
+
+.fm-clarify-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink);
+  background: var(--surface, #F7F3ED);
+  border: 1px solid #D8D0C8;
+  border-radius: 4px;
+  resize: vertical;
+  min-height: 60px;
+}
+.fm-clarify-input:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+.fm-clarify-input::placeholder {
+  color: var(--ink3);
+  font-style: italic;
+}
+
+.fm-clarify-submit {
+  margin-top: 8px;
+  font-family: var(--font-label) !important;
+  font-size: 10px !important;
+  font-weight: 500;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--surface, #F7F3ED);
+  background: var(--accent);
+  border: none;
+  border-radius: 3px;
+  padding: 5px 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.fm-clarify-submit:hover { background: var(--accent-hover); }
+.fm-clarify-submit:disabled { opacity: 0.5; cursor: default; }
+
+.fm-clarify-loading {
+  font-family: var(--font-body);
+  font-style: italic;
+  font-size: 12px;
+  color: var(--ink3);
+  margin-top: 10px;
+  display: none;
 }
 
 
@@ -520,6 +718,15 @@ The discomfort is where the learning lives."></textarea>
             <span class="k-lbl">What these relationships mean</span>
           </div>
           <div class="fm-glossary-grid" id="glossary-items"></div>
+        </div>
+
+        <!-- Individual findings with clarify -->
+        <div id="findings-section" style="display:none">
+          <div class="fm-section-label">
+            <span class="k-lbl">Individual findings</span>
+            <span class="fm-section-note">Each structural relationship the rules detected. Disagree with any finding to add your context.</span>
+          </div>
+          <div class="fm-findings" id="findings-items"></div>
         </div>
 
         <!-- Fragment list with tags (promoted from canvas — clearer than the map) -->
@@ -744,6 +951,9 @@ async function runAnalysis() {
   document.getElementById('narrative-label').style.display = 'none';
   document.getElementById('fragment-list-section').style.display = 'none';
   document.getElementById('glossary-section').style.display = 'none';
+  document.getElementById('findings-section').style.display = 'none';
+  document.getElementById('findings-items').innerHTML = '';
+  window._findings = [];
 
   // Show loading state in the results card
   const headingDiv = document.querySelector('.fm-results-heading');
@@ -840,6 +1050,7 @@ function handleSSE(event, data, frags) {
       document.querySelector('.fm-input-section').style.display = 'none';
       buildSummary(data);
       buildGlossary(data);
+      buildFindings(data);
       buildPipeline(data);
 
       // Build fragment list with tags (in results section)
@@ -1041,6 +1252,298 @@ function buildGlossary(data) {
     '<span>' + desc + '</span>' +
     '</div>'
   ).join('');
+}
+
+
+/* ── Findings (individual, with clarify) ──────────────────────── */
+
+// Targeted questions per rule type
+const CLARIFY_QUESTIONS = {
+  neighbour: 'The tool groups these fragments together based on shared vocabulary and meaning. Do they belong together, or are they more different than they appear?',
+  stray: 'This fragment does not connect to the others. Is it a separate thread, or does it relate in a way that is not obvious from the text?',
+  rift: 'The tool sees a gap between these two fragments — same topic, opposing pull. What connection did you intend?',
+  fork: 'The tool notices different language here for what it reads as the same idea. Are these about the same thing or different things?',
+  echo: 'The tool sees overlap in voice between these fragments, even though the topics differ. Do they cover the same ground, or is there a distinction the tool is missing?',
+  shift: 'This fragment is written in a markedly different voice from the rest. Is that deliberate, or does it surprise you?',
+};
+
+// Build a short deterministic description for each finding (not AI-generated)
+function findingDesc(type, data, indices) {
+  const fLabel = (i) => 'Fragment ' + (i + 1);
+  switch (type) {
+    case 'neighbour': {
+      const labels = indices.map(i => fLabel(i)).join(', ');
+      return labels + ' share enough vocabulary and meaning to form a group.';
+    }
+    case 'stray':
+      return fLabel(indices[0]) + ' sits apart — its maximum similarity to any other fragment is below the threshold.';
+    case 'rift': {
+      const r = data;
+      return fLabel(r.pair[0]) + ' and ' + fLabel(r.pair[1]) +
+        ' are about the same topic (similarity ' + r.embedding_sim.toFixed(2) +
+        ') but pull in opposite emotional directions (sentiment delta ' +
+        r.sentiment_delta.toFixed(2) + ').';
+    }
+    case 'fork': {
+      const f = data;
+      return fLabel(f.pair[0]) + ' and ' + fLabel(f.pair[1]) +
+        ' share meaning (similarity ' + f.embedding_sim.toFixed(2) +
+        ') but use notably different vocabulary (TF-IDF ' + f.tfidf_sim.toFixed(2) + ').';
+    }
+    case 'echo': {
+      const e = data;
+      return fLabel(e.pair[0]) + ' and ' + fLabel(e.pair[1]) +
+        ' are about different topics (similarity ' + e.embedding_sim.toFixed(2) +
+        ') but share the same voice (' + (e.shared_traits || []).join(', ') + ').';
+    }
+    case 'shift':
+      return fLabel(indices[0]) + ' is written in a markedly different voice from the rest of the set.';
+    default:
+      return '';
+  }
+}
+
+function truncate(text, len) {
+  if (text.length <= len) return text;
+  return text.substring(0, len) + '...';
+}
+
+function buildFindings(data) {
+  const fragments = data.fragments || [];
+  const findings = [];
+  let findingId = 0;
+
+  // Neighbours (each group is one finding)
+  for (const group of (data.neighbours || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'neighbour',
+      indices: group,
+      rawData: group,
+      desc: findingDesc('neighbour', group, group),
+      fragmentA: fragments[group[0]] || '',
+      fragmentB: group.length > 1 ? fragments[group[1]] || '' : '',
+      scores: {},
+    });
+  }
+
+  // Strays
+  for (const idx of (data.strays || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'stray',
+      indices: [idx],
+      rawData: idx,
+      desc: findingDesc('stray', idx, [idx]),
+      fragmentA: fragments[idx] || '',
+      fragmentB: '',
+      scores: {},
+    });
+  }
+
+  // Rifts
+  for (const r of (data.rifts || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'rift',
+      indices: r.pair,
+      rawData: r,
+      desc: findingDesc('rift', r, r.pair),
+      fragmentA: fragments[r.pair[0]] || '',
+      fragmentB: fragments[r.pair[1]] || '',
+      scores: {
+        embedding_sim: r.embedding_sim,
+        sentiment_delta: r.sentiment_delta,
+        signals: r.signals,
+      },
+    });
+  }
+
+  // Forks
+  for (const f of (data.forks || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'fork',
+      indices: f.pair,
+      rawData: f,
+      desc: findingDesc('fork', f, f.pair),
+      fragmentA: fragments[f.pair[0]] || '',
+      fragmentB: fragments[f.pair[1]] || '',
+      scores: {
+        embedding_sim: f.embedding_sim,
+        tfidf_sim: f.tfidf_sim,
+        fork_magnitude: f.fork_magnitude,
+      },
+    });
+  }
+
+  // Echoes
+  for (const e of (data.echoes || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'echo',
+      indices: e.pair,
+      rawData: e,
+      desc: findingDesc('echo', e, e.pair),
+      fragmentA: fragments[e.pair[0]] || '',
+      fragmentB: fragments[e.pair[1]] || '',
+      scores: {
+        embedding_sim: e.embedding_sim,
+        sentiment_proximity: e.sentiment_proximity,
+        shared_traits: e.shared_traits,
+      },
+    });
+  }
+
+  // Shifts
+  for (const idx of (data.shifts || [])) {
+    findings.push({
+      id: findingId++,
+      type: 'shift',
+      indices: [idx],
+      rawData: idx,
+      desc: findingDesc('shift', idx, [idx]),
+      fragmentA: fragments[idx] || '',
+      fragmentB: '',
+      scores: {},
+    });
+  }
+
+  if (findings.length === 0) {
+    document.getElementById('findings-section').style.display = 'none';
+    return;
+  }
+
+  // Store findings globally for the clarify handler
+  window._findings = findings;
+
+  document.getElementById('findings-section').style.display = '';
+  document.getElementById('findings-items').innerHTML = findings.map(f => {
+    const fragLabels = f.indices.map(i => 'Fragment ' + (i + 1)).join(' & ');
+
+    // Quote snippets
+    let quotes = '';
+    if (f.fragmentA) {
+      quotes += '<div class="fm-finding-quotes">';
+      quotes += esc(truncate(f.fragmentA, 120));
+      if (f.fragmentB) quotes += '<br>' + esc(truncate(f.fragmentB, 120));
+      quotes += '</div>';
+    }
+
+    return '<div class="fm-finding" id="finding-' + f.id + '">' +
+      '<div class="fm-finding-header">' +
+        '<span class="fm-finding-type">' + esc(f.type) + '</span>' +
+        '<span class="fm-finding-fragments">' + esc(fragLabels) + '</span>' +
+      '</div>' +
+      quotes +
+      '<div class="fm-finding-desc" id="finding-desc-' + f.id + '">' + esc(f.desc) + '</div>' +
+      '<button class="fm-disagree-btn" id="disagree-btn-' + f.id + '" onclick="openClarify(' + f.id + ')">' +
+        'I disagree' +
+      '</button>' +
+      '<div class="fm-clarify-form" id="clarify-form-' + f.id + '">' +
+        '<div class="fm-clarify-question">' + esc(CLARIFY_QUESTIONS[f.type] || '') + '</div>' +
+        '<textarea class="fm-clarify-input" id="clarify-input-' + f.id + '" placeholder="Tell the tool what it is missing..." rows="2"></textarea>' +
+        '<button class="fm-clarify-submit" id="clarify-submit-' + f.id + '" onclick="submitClarify(' + f.id + ')">Submit</button>' +
+        '<div class="fm-clarify-loading" id="clarify-loading-' + f.id + '">Revising this finding...</div>' +
+      '</div>' +
+    '</div>';
+  }).join('');
+}
+
+
+function openClarify(findingId) {
+  const form = document.getElementById('clarify-form-' + findingId);
+  const btn = document.getElementById('disagree-btn-' + findingId);
+  if (form.classList.contains('open')) {
+    form.classList.remove('open');
+    return;
+  }
+  form.classList.add('open');
+  // Focus the input
+  setTimeout(() => {
+    document.getElementById('clarify-input-' + findingId).focus();
+  }, 50);
+}
+
+
+async function submitClarify(findingId) {
+  const finding = (window._findings || []).find(f => f.id === findingId);
+  if (!finding) return;
+
+  const input = document.getElementById('clarify-input-' + findingId);
+  const clarification = input.value.trim();
+  if (!clarification) { input.focus(); return; }
+
+  const submitBtn = document.getElementById('clarify-submit-' + findingId);
+  const loadingEl = document.getElementById('clarify-loading-' + findingId);
+  const disagreeBtn = document.getElementById('disagree-btn-' + findingId);
+
+  submitBtn.disabled = true;
+  input.disabled = true;
+  loadingEl.style.display = 'block';
+
+  try {
+    const res = await fetch('/api/clarify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'same-origin',
+      body: JSON.stringify({
+        fragment_a: finding.fragmentA,
+        fragment_b: finding.fragmentB,
+        rule_type: finding.type,
+        original_finding: finding.desc,
+        scores: finding.scores,
+        clarification: clarification,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      loadingEl.textContent = 'Revision failed: ' + (err.detail || 'Unknown error');
+      loadingEl.style.color = '#C75B39';
+      submitBtn.disabled = false;
+      input.disabled = false;
+      return;
+    }
+
+    const result = await res.json();
+
+    // Build score delta display
+    let deltaHtml = '';
+    if (result.score_deltas && Object.keys(result.score_deltas).length > 0) {
+      deltaHtml = '<div class="fm-score-deltas">';
+      for (const [metric, d] of Object.entries(result.score_deltas)) {
+        const label = metric.replace(/_/g, ' ');
+        const arrow = d.delta > 0 ? '↑' : d.delta < 0 ? '↓' : '→';
+        const cls = Math.abs(d.delta) > 0.05 ? 'fm-delta-significant' : 'fm-delta-minor';
+        deltaHtml += '<span class="fm-delta-item ' + cls + '">' +
+          label + ': ' + d.old.toFixed(3) + ' → ' + d.new.toFixed(3) + ' ' + arrow +
+          '</span>';
+      }
+      deltaHtml += '</div>';
+    }
+
+    // Replace the finding description with score deltas + revised narrative
+    const descEl = document.getElementById('finding-desc-' + findingId);
+    descEl.innerHTML =
+      '<div class="fm-finding-revised-label">Revised after your clarification</div>' +
+      deltaHtml +
+      '<div class="fm-finding-narrative">' + esc(result.revised_narrative) + '</div>';
+
+    // Hide the form, disable the button
+    document.getElementById('clarify-form-' + findingId).classList.remove('open');
+    document.getElementById('clarify-form-' + findingId).style.display = 'none';
+    disagreeBtn.textContent = 'Clarified';
+    disagreeBtn.classList.add('clarified');
+    disagreeBtn.disabled = true;
+    disagreeBtn.onclick = null;
+
+  } catch (err) {
+    loadingEl.textContent = 'Connection failed.';
+    loadingEl.style.color = '#C75B39';
+    submitBtn.disabled = false;
+    input.disabled = false;
+  }
 }
 
 

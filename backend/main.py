@@ -11,6 +11,7 @@ Architecture: AI handles language. Code handles judgment. Humans make decisions.
 
 import asyncio
 import json
+import os
 import secrets
 import smtplib
 import sqlite3
@@ -22,58 +23,52 @@ from email.mime.text import MIMEText
 from pathlib import Path
 from typing import Optional
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request, Response, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
+from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
 from pydantic import BaseModel, field_validator
 
-from config import (
-    ENABLE_AUTH,
-    HF_TOKEN,
-    OPENROUTER_API_KEY,
-    ADMIN_PASSWORD,
-    SESSION_SECRET,
-    BASE_URL,
-    MAX_ANALYSES_PER_DAY,
-    ALLOWED_EMAILS,
-    ALLOWED_DOMAINS,
-    SMTP_HOST,
-    SMTP_PORT,
-    SMTP_USERNAME,
-    SMTP_PASSWORD,
-    SMTP_FROM_EMAIL,
-    SMTP_FROM_NAME,
-    DB_PATH,
-    MIN_FRAGMENTS,
-    MAX_FRAGMENTS,
-    MIN_FRAGMENT_WORDS,
-    MAX_FRAGMENT_WORDS,
-    validate_config,
-    print_config_summary,
-)
+load_dotenv(Path(__file__).parent.parent / ".env")
 
 
 # =============================================================================
-# Conditional auth imports
+# Configuration
 # =============================================================================
 
-if ENABLE_AUTH:
-    from itsdangerous import URLSafeTimedSerializer, BadSignature, SignatureExpired
-    serializer = URLSafeTimedSerializer(SESSION_SECRET)
+MAX_ANALYSES_PER_DAY = 10
+MIN_FRAGMENTS = 2
+MAX_FRAGMENTS = 20
+MIN_FRAGMENT_WORDS = 5
+MAX_FRAGMENT_WORDS = 200
 
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
+HF_TOKEN = os.environ.get("HF_TOKEN", "").strip()
+
+SESSION_SECRET = os.environ.get("SESSION_SECRET")
+if not SESSION_SECRET:
+    raise RuntimeError("SESSION_SECRET environment variable is required")
+
+serializer = URLSafeTimedSerializer(SESSION_SECRET)
 COOKIE_NAME = "fragmentmapper_session"
 
-# Indian Standard Time (UTC+5:30)
-IST = timezone(timedelta(hours=5, minutes=30))
+BASE_URL = os.environ.get("BASE_URL", "http://localhost:8000").rstrip("/")
 
-# Paths
-BASE_DIR = Path(__file__).parent.parent
-FRONTEND_DIR = BASE_DIR / "frontend"
-DATA_DIR = BASE_DIR / "data"
-
-# Logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("fragment-mapper")
+# Access control -- allowlist (optional fast-track)
+# Comma-separated emails that skip verification. Empty string = no fast-track.
+ALLOWED_EMAILS = {
+    e.strip().lower()
+    for e in os.environ.get("ALLOWED_EMAILS", "").split(",")
+    if e.strip()
+}
+# Comma-separated domains (e.g. "anu.edu.in,iitb.ac.in"). Empty string = no domain allowlist.
+ALLOWED_DOMAINS = {
+    d.strip().lower()
+    for d in os.environ.get("ALLOWED_DOMAINS", "").split(",")
+    if d.strip()
+}
 
 
 def is_email_allowed(email: str) -> bool:
@@ -89,6 +84,26 @@ def is_email_allowed(email: str) -> bool:
     return False
 
 
+# SMTP configuration (optional -- falls back to console output)
+POSTAL_SMTP_HOST = os.environ.get("POSTAL_SMTP_HOST", "")
+POSTAL_SMTP_PORT = int(os.environ.get("POSTAL_SMTP_PORT", "25"))
+POSTAL_SMTP_USERNAME = os.environ.get("POSTAL_SMTP_USERNAME", "")
+POSTAL_SMTP_PASSWORD = os.environ.get("POSTAL_SMTP_PASSWORD", "")
+
+# Indian Standard Time (UTC+5:30)
+IST = timezone(timedelta(hours=5, minutes=30))
+
+# Paths
+BASE_DIR = Path(__file__).parent.parent
+FRONTEND_DIR = BASE_DIR / "frontend"
+DATA_DIR = BASE_DIR / "data"
+DB_PATH = DATA_DIR / "fragmentmapper.db"
+
+# Logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("fragment-mapper")
+
+
 # =============================================================================
 # Database Management
 # =============================================================================
@@ -100,19 +115,18 @@ def init_db():
     conn = sqlite3.connect(str(DB_PATH))
     cursor = conn.cursor()
 
-    if ENABLE_AUTH:
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS users (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT NOT NULL,
-                email TEXT NOT NULL UNIQUE,
-                verified INTEGER DEFAULT 0,
-                verification_token TEXT,
-                token_expires_at TEXT,
-                created_at TEXT NOT NULL,
-                usage_count INTEGER DEFAULT 0
-            )
-        """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS users (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL UNIQUE,
+            verified INTEGER DEFAULT 0,
+            verification_token TEXT,
+            token_expires_at TEXT,
+            created_at TEXT NOT NULL,
+            usage_count INTEGER DEFAULT 0
+        )
+    """)
 
     # Check if submissions table has v2 schema (cluster_count) and drop it
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='submissions'")
@@ -120,7 +134,7 @@ def init_db():
         cursor.execute("PRAGMA table_info(submissions)")
         cols = {row[1] for row in cursor.fetchall()}
         if "cluster_count" in cols or "neighbour_count" not in cols:
-            logger.info("Dropping old v2 submissions table -- recreating with v3 schema")
+            logger.info("Dropping old v2 submissions table — recreating with v3 schema")
             cursor.execute("DROP TABLE submissions")
 
     cursor.execute("""
@@ -148,7 +162,7 @@ def get_db():
 
 
 # =============================================================================
-# User Management (only used when ENABLE_AUTH=1)
+# User Management
 # =============================================================================
 
 def register_user(name: str, email: str) -> dict:
@@ -278,9 +292,6 @@ def verify_token(token: str) -> Optional[dict]:
 
 def get_authenticated_user(request: Request) -> Optional[dict]:
     """Get authenticated user from session cookie. Returns user dict or None."""
-    if not ENABLE_AUTH:
-        return None
-
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         return None
@@ -318,8 +329,6 @@ def get_authenticated_user(request: Request) -> Optional[dict]:
 
 def increment_usage(email: str):
     """Increment lifetime usage count for a user."""
-    if not ENABLE_AUTH:
-        return
     conn = get_db()
     cursor = conn.cursor()
     cursor.execute(
@@ -403,7 +412,7 @@ def log_submission(
 
 
 # =============================================================================
-# Email (only used when ENABLE_AUTH=1)
+# Email
 # =============================================================================
 
 def build_verification_email(name: str, verify_url: str) -> tuple[str, str]:
@@ -416,7 +425,8 @@ Click the link below to verify your email and access Fragment Mapper:
 
 This link expires in 1 hour.
 
--- Fragment Mapper"""
+-- Koher
+koher.app"""
 
     html = f"""<!DOCTYPE html>
 <html>
@@ -431,7 +441,7 @@ This link expires in 1 hour.
     <p style="font-size: 13px; color: #8a9fa4; word-break: break-all; margin-bottom: 32px;">{verify_url}</p>
     <p style="font-size: 14px; color: #8a9fa4;">This link expires in 1 hour.</p>
     <hr style="border: none; border-top: 1px solid #2a4248; margin: 32px 0;">
-    <p style="font-size: 13px; color: #8a9fa4;">Fragment Mapper &mdash; <a href="https://koher.app" style="color: #d4a157; text-decoration: none;">koher.app</a></p>
+    <p style="font-size: 13px; color: #8a9fa4;">Koher &mdash; <a href="https://koher.app" style="color: #d4a157; text-decoration: none;">koher.app</a></p>
 </body>
 </html>"""
 
@@ -439,7 +449,7 @@ This link expires in 1 hour.
 
 
 def send_verification_email(name: str, email: str, token: str):
-    """Send verification email via SMTP. Always prints URL to console."""
+    """Send verification email via Postal SMTP. Always prints URL to console."""
     verify_url = f"{BASE_URL}/auth/verify/{token}"
     html_body, plain_body = build_verification_email(name, verify_url)
 
@@ -450,11 +460,11 @@ def send_verification_email(name: str, email: str, token: str):
     print(f"Verify URL: {verify_url}")
     print(f"{'='*60}\n")
 
-    if not SMTP_HOST or not SMTP_USERNAME:
+    if not POSTAL_SMTP_HOST or not POSTAL_SMTP_USERNAME:
         return
 
     msg = MIMEMultipart("alternative")
-    msg["From"] = f"{SMTP_FROM_NAME} <{SMTP_FROM_EMAIL}>"
+    msg["From"] = "Koher <hello@koher.app>"
     msg["To"] = email
     msg["Subject"] = "Verify your email \u2014 Fragment Mapper"
 
@@ -462,17 +472,17 @@ def send_verification_email(name: str, email: str, token: str):
     msg.attach(MIMEText(html_body, "html"))
 
     try:
-        with smtplib.SMTP(SMTP_HOST, SMTP_PORT) as server:
+        with smtplib.SMTP(POSTAL_SMTP_HOST, POSTAL_SMTP_PORT) as server:
             server.starttls()
-            server.login(SMTP_USERNAME, SMTP_PASSWORD)
-            server.sendmail(SMTP_FROM_EMAIL, email, msg.as_string())
+            server.login(POSTAL_SMTP_USERNAME, POSTAL_SMTP_PASSWORD)
+            server.sendmail("hello@koher.app", email, msg.as_string())
         print(f"Verification email sent to {email}")
     except Exception as e:
         print(f"Failed to send verification email to {email}: {e}")
 
 
 # =============================================================================
-# Session Cookie Helpers (only used when ENABLE_AUTH=1)
+# Session Cookie Helpers
 # =============================================================================
 
 def set_session_cookie(response: Response, email: str):
@@ -522,10 +532,6 @@ analysis_semaphore = asyncio.Semaphore(MAX_CONCURRENT_ANALYSES)
 async def lifespan(app: FastAPI):
     """Initialise analyser and narrator at startup, clean up on shutdown."""
     global analyser, narrator
-
-    # Validate configuration
-    validate_config()
-    print_config_summary()
 
     logger.info("Initialising database...")
     init_db()
@@ -615,33 +621,55 @@ class RegisterRequest(BaseModel):
     email: str
 
 
+class ClarifyRequest(BaseModel):
+    """Input: a clarification disputing one finding."""
+    fragment_a: str
+    fragment_b: str = ""
+    rule_type: str
+    original_finding: str
+    scores: dict = {}
+    clarification: str
+
+    @field_validator("rule_type")
+    @classmethod
+    def validate_rule_type(cls, v):
+        allowed = {"neighbour", "stray", "rift", "fork", "echo", "shift"}
+        if v not in allowed:
+            raise ValueError(f"rule_type must be one of {allowed}")
+        return v
+
+    @field_validator("clarification")
+    @classmethod
+    def validate_clarification(cls, v):
+        v = v.strip()
+        if not v:
+            raise ValueError("Clarification text is required")
+        if len(v) > 1000:
+            raise ValueError("Clarification must be under 1000 characters")
+        return v
+
+
 class AdminLoginRequest(BaseModel):
     """Input: admin password."""
     password: str
 
 
 # =============================================================================
-# Auth Routes (only registered when ENABLE_AUTH=1)
+# Auth Routes
 # =============================================================================
 
-if ENABLE_AUTH:
-    @app.post("/auth/register")
-    async def auth_register(body: RegisterRequest):
-        """Register a new user or resend verification. Allowed emails skip verification."""
-        name = body.name.strip()
-        email = body.email.strip().lower()
+@app.post("/auth/register")
+async def auth_register(body: RegisterRequest):
+    """Register a new user or resend verification. Allowed emails skip verification."""
+    name = body.name.strip()
+    email = body.email.strip().lower()
 
-        if not name:
-            raise HTTPException(status_code=400, detail="Name is required")
-        if not email or "@" not in email:
-            raise HTTPException(status_code=400, detail="Valid email is required")
+    if not name:
+        raise HTTPException(status_code=400, detail="Name is required")
+    if not email or "@" not in email:
+        raise HTTPException(status_code=400, detail="Valid email is required")
 
-        if not is_email_allowed(email):
-            raise HTTPException(
-                status_code=403,
-                detail="This tool is in beta. Your email is not on the access list."
-            )
-
+    if is_email_allowed(email):
         # Allowed emails: auto-verify and set session cookie immediately
         user = auto_register_verified(name, email)
         response = JSONResponse(
@@ -650,48 +678,55 @@ if ENABLE_AUTH:
         set_session_cookie(response, email)
         return response
 
-    @app.get("/auth/verify/{token}")
-    async def auth_verify(token: str):
-        """Verify email token, set session cookie, redirect to /."""
-        user = verify_token(token)
+    # All other emails: send verification link
+    result = register_user(name, email)
+    return JSONResponse(content=result)
 
-        if not user:
-            error_html = """<!DOCTYPE html>
+
+@app.get("/auth/verify/{token}")
+async def auth_verify(token: str):
+    """Verify email token, set session cookie, redirect to /."""
+    user = verify_token(token)
+
+    if not user:
+        error_html = """<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Verification Failed</title>
 <style>body { font-family: Georgia, serif; background: #0f1a1c; color: #e0e8ea; display: flex; justify-content: center; align-items: center; min-height: 100vh; }
 .msg { text-align: center; max-width: 400px; } a { color: #d4a157; }</style></head>
 <body><div class="msg"><h2>Verification link expired or invalid</h2><p>Please <a href="/">register again</a> to get a new link.</p></div></body></html>"""
-            return HTMLResponse(content=error_html, status_code=400)
+        return HTMLResponse(content=error_html, status_code=400)
 
-        # Set session cookie and redirect
-        response = HTMLResponse(
-            content="<html><head><meta http-equiv='refresh' content='0;url=/'></head><body>Redirecting...</body></html>",
-            status_code=200,
-        )
-        set_session_cookie(response, user["email"])
-        return response
+    # Set session cookie and redirect
+    response = HTMLResponse(
+        content="<html><head><meta http-equiv='refresh' content='0;url=/'></head><body>Redirecting...</body></html>",
+        status_code=200,
+    )
+    set_session_cookie(response, user["email"])
+    return response
 
-    @app.get("/auth/check")
-    async def auth_check(request: Request):
-        """Check if user is logged in. Returns user info or 401."""
-        user = get_authenticated_user(request)
-        if not user:
-            raise HTTPException(status_code=401, detail="Not authenticated")
 
-        return {
-            "name": user["name"],
-            "email": user["email"],
-            "daily_usage": user["daily_usage"],
-            "remaining_analyses": user["remaining_analyses"],
-            "limit_reached": user["limit_reached"],
-        }
+@app.get("/auth/check")
+async def auth_check(request: Request):
+    """Check if user is logged in. Returns user info or 401."""
+    user = get_authenticated_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Not authenticated")
 
-    @app.post("/auth/logout")
-    async def auth_logout():
-        """Clear session cookie."""
-        response = JSONResponse(content={"status": "ok"})
-        response.delete_cookie(key=COOKIE_NAME, path="/")
-        return response
+    return {
+        "name": user["name"],
+        "email": user["email"],
+        "daily_usage": user["daily_usage"],
+        "remaining_analyses": user["remaining_analyses"],
+        "limit_reached": user["limit_reached"],
+    }
+
+
+@app.post("/auth/logout")
+async def auth_logout():
+    """Clear session cookie."""
+    response = JSONResponse(content={"status": "ok"})
+    response.delete_cookie(key=COOKIE_NAME, path="/")
+    return response
 
 
 # =============================================================================
@@ -733,7 +768,6 @@ async def health():
         "active_analyses": MAX_CONCURRENT_ANALYSES - analysis_semaphore._value,
         "max_concurrent": MAX_CONCURRENT_ANALYSES,
         "hf_token_set": bool(HF_TOKEN),
-        "auth_enabled": ENABLE_AUTH,
     }
 
 
@@ -753,18 +787,17 @@ async def analyse(request: Request, body: AnalyseRequest):
     if analyser is None:
         raise HTTPException(status_code=503, detail="Analyser not initialised")
 
-    # Auth check (conditional on ENABLE_AUTH)
-    user_email = "anonymous"
-    if ENABLE_AUTH:
-        user = get_authenticated_user(request)
-        if not user:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        if user["limit_reached"]:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Daily limit reached ({MAX_ANALYSES_PER_DAY} analyses per day). Resets at midnight IST."
-            )
-        user_email = user["email"]
+    # Auth check
+    user = get_authenticated_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Rate limiting (IST day boundary)
+    if user["limit_reached"]:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily limit reached ({MAX_ANALYSES_PER_DAY} analyses per day). Resets at midnight IST."
+        )
 
     # Concurrency gate -- up to 3 concurrent, then queue with timeout.
     try:
@@ -778,7 +811,7 @@ async def analyse(request: Request, body: AnalyseRequest):
     try:
         # Stage 1 + Stage 2 (async -- HF API call is async, rest is sync within)
         logger.info(
-            f"Analysing {len(body.fragments)} fragments from {user_email}"
+            f"Analysing {len(body.fragments)} fragments from {user['email']}"
         )
         try:
             analysis_dict = await analyser.analyse(body.fragments)
@@ -797,7 +830,7 @@ async def analyse(request: Request, body: AnalyseRequest):
 
         # Log submission
         log_submission(
-            user_email=user_email,
+            user_email=user["email"],
             fragment_count=analysis_dict["fragment_count"],
             neighbour_count=len(analysis_dict["neighbours"]),
             stray_count=len(analysis_dict["strays"]),
@@ -806,20 +839,14 @@ async def analyse(request: Request, body: AnalyseRequest):
             echo_count=len(analysis_dict["echoes"]),
             shift_count=len(analysis_dict["shifts"]),
         )
+        increment_usage(user["email"])
+        daily_count = get_daily_usage_count(user["email"])
 
-        if ENABLE_AUTH:
-            increment_usage(user_email)
-            daily_count = get_daily_usage_count(user_email)
-            return {
-                "analysis": analysis_dict,
-                "narrative": narrative,
-                "remaining_today": MAX_ANALYSES_PER_DAY - daily_count,
-            }
-        else:
-            return {
-                "analysis": analysis_dict,
-                "narrative": narrative,
-            }
+        return {
+            "analysis": analysis_dict,
+            "narrative": narrative,
+            "remaining_today": MAX_ANALYSES_PER_DAY - daily_count,
+        }
     finally:
         analysis_semaphore.release()
 
@@ -835,18 +862,17 @@ async def analyse_stream(request: Request, body: AnalyseRequest):
     if analyser is None:
         raise HTTPException(status_code=503, detail="Analyser not initialised")
 
-    # Auth check (conditional on ENABLE_AUTH)
-    user_email = "anonymous"
-    if ENABLE_AUTH:
-        user = get_authenticated_user(request)
-        if not user:
-            raise HTTPException(status_code=401, detail="Authentication required")
-        if user["limit_reached"]:
-            raise HTTPException(
-                status_code=429,
-                detail=f"Daily limit reached ({MAX_ANALYSES_PER_DAY} analyses per day)."
-            )
-        user_email = user["email"]
+    # Auth check
+    user = get_authenticated_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    # Rate limiting (IST day boundary)
+    if user["limit_reached"]:
+        raise HTTPException(
+            status_code=429,
+            detail=f"Daily limit reached ({MAX_ANALYSES_PER_DAY} analyses per day)."
+        )
 
     # Concurrency gate -- up to 3 concurrent, then queue with timeout.
     try:
@@ -867,7 +893,7 @@ async def analyse_stream(request: Request, body: AnalyseRequest):
 
         # Log submission
         log_submission(
-            user_email=user_email,
+            user_email=user["email"],
             fragment_count=analysis_dict["fragment_count"],
             neighbour_count=len(analysis_dict["neighbours"]),
             stray_count=len(analysis_dict["strays"]),
@@ -876,10 +902,8 @@ async def analyse_stream(request: Request, body: AnalyseRequest):
             echo_count=len(analysis_dict["echoes"]),
             shift_count=len(analysis_dict["shifts"]),
         )
-
-        if ENABLE_AUTH:
-            increment_usage(user_email)
-            daily_count = get_daily_usage_count(user_email)
+        increment_usage(user["email"])
+        daily_count = get_daily_usage_count(user["email"])
     finally:
         analysis_semaphore.release()
 
@@ -887,9 +911,8 @@ async def analyse_stream(request: Request, body: AnalyseRequest):
         # First event: analysis data (Stage 1 + Stage 2)
         yield f"event: analysis\ndata: {json.dumps(analysis_dict)}\n\n"
 
-        # Second event: remaining count (only in auth mode)
-        if ENABLE_AUTH:
-            yield f"event: remaining\ndata: {json.dumps({'remaining_today': MAX_ANALYSES_PER_DAY - daily_count})}\n\n"
+        # Second event: remaining count
+        yield f"event: remaining\ndata: {json.dumps({'remaining_today': MAX_ANALYSES_PER_DAY - daily_count})}\n\n"
 
         # Stream narration if available (async)
         if narrator is not None:
@@ -917,7 +940,105 @@ async def analyse_stream(request: Request, body: AnalyseRequest):
 
 
 # =============================================================================
-# Admin Routes (always available if ADMIN_PASSWORD is set)
+# Clarify Route
+# =============================================================================
+
+@app.post("/api/clarify")
+async def clarify_finding(request: Request, body: ClarifyRequest):
+    """
+    Re-run the pipeline on combined text (original fragments + clarification)
+    and return updated scores + revised narrative.
+
+    The student's clarification is additional input to Stage 1. The same
+    deterministic rules apply to the new signals. Scores may change because
+    the input changed. The architecture holds: AI qualifies, code judges.
+    """
+    # Auth check
+    user = get_authenticated_user(request)
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
+
+    if narrator is None:
+        raise HTTPException(
+            status_code=503,
+            detail="Narrator not available — cannot revise finding",
+        )
+
+    # Re-run Stage 1 with combined text for pair-based rules
+    combined_a = body.fragment_a + "\n\n" + body.clarification
+    old_scores = body.scores
+    new_scores = {}
+    score_deltas = {}
+
+    if body.rule_type in {"rift", "fork", "echo", "neighbour"} and body.fragment_b:
+        try:
+            from src.fragment_analyser import (
+                compute_embeddings, compute_tfidf_signals,
+                compute_sentiment, compute_lexical_profile,
+            )
+
+            # Compute new signals on [combined_a, fragment_b]
+            fragments_pair = [combined_a, body.fragment_b]
+
+            sim_matrix, _ = await compute_embeddings(fragments_pair, HF_TOKEN)
+            tfidf_sim, _, _ = compute_tfidf_signals(fragments_pair)
+            sentiments = compute_sentiment(fragments_pair)
+            lex_a = compute_lexical_profile(combined_a)
+            lex_b = compute_lexical_profile(body.fragment_b)
+
+            new_scores = {
+                "embedding_similarity": float(sim_matrix[0][1]),
+                "tfidf_similarity": float(tfidf_sim[0][1]),
+                "sentiment_a": sentiments[0]["compound"],
+                "sentiment_b": sentiments[1]["compound"],
+                "sentiment_delta": abs(sentiments[0]["compound"] - sentiments[1]["compound"]),
+            }
+
+            # Compute deltas against old scores
+            for key in new_scores:
+                if key in old_scores:
+                    old_val = float(old_scores[key])
+                    new_val = new_scores[key]
+                    score_deltas[key] = {
+                        "old": round(old_val, 3),
+                        "new": round(new_val, 3),
+                        "delta": round(new_val - old_val, 3),
+                    }
+
+        except Exception as e:
+            logger.warning(f"Signal recomputation failed, falling back to narration-only: {e}")
+            new_scores = old_scores
+    else:
+        # For stray/shift: need full fragment set to re-score properly.
+        # Fall back to narration-only revision.
+        new_scores = old_scores
+
+    try:
+        revised = await narrator.revise_finding(
+            rule_type=body.rule_type,
+            fragment_a=body.fragment_a,
+            fragment_b=body.fragment_b or None,
+            original_finding=body.original_finding,
+            scores=new_scores,
+            score_deltas=score_deltas,
+            clarification=body.clarification,
+        )
+    except Exception as e:
+        logger.error(f"Clarify failed: {type(e).__name__}: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Revision failed: {type(e).__name__}",
+        )
+
+    return {
+        "revised_narrative": revised,
+        "new_scores": new_scores,
+        "score_deltas": score_deltas,
+    }
+
+
+# =============================================================================
+# Admin Routes
 # =============================================================================
 
 @app.post("/admin/login")
@@ -934,11 +1055,8 @@ async def admin_users(admin_password: str = ""):
     if not ADMIN_PASSWORD or admin_password != ADMIN_PASSWORD:
         raise HTTPException(status_code=401, detail="Unauthorised")
 
-    if ENABLE_AUTH:
-        users = get_all_users()
-        return {"users": users}
-    else:
-        return {"users": []}
+    users = get_all_users()
+    return {"users": users}
 
 
 @app.get("/admin/stats")
@@ -950,13 +1068,13 @@ async def admin_stats(admin_password: str = ""):
     conn = get_db()
     cursor = conn.cursor()
 
-    total_users = 0
-    verified_users = 0
-    if ENABLE_AUTH:
-        cursor.execute("SELECT COUNT(*) FROM users")
-        total_users = cursor.fetchone()[0]
-        cursor.execute("SELECT COUNT(*) FROM users WHERE verified = 1")
-        verified_users = cursor.fetchone()[0]
+    # Total users
+    cursor.execute("SELECT COUNT(*) FROM users")
+    total_users = cursor.fetchone()[0]
+
+    # Verified users
+    cursor.execute("SELECT COUNT(*) FROM users WHERE verified = 1")
+    verified_users = cursor.fetchone()[0]
 
     # Active users (have at least one submission)
     cursor.execute("SELECT COUNT(DISTINCT user_email) FROM submissions")

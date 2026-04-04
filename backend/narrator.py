@@ -222,6 +222,102 @@ class FragmentNarrator:
         content = response.choices[0].message.content or ""
         return content.strip()
 
+    async def revise_finding(
+        self,
+        rule_type: str,
+        fragment_a: str,
+        fragment_b: str | None,
+        original_finding: str,
+        scores: dict,
+        clarification: str,
+        score_deltas: dict | None = None,
+    ) -> str:
+        """
+        Re-narrate a single finding after re-running the pipeline with
+        the student's clarification as additional input.
+
+        The signals are re-computed on the combined text (original fragment
+        + clarification). Scores may have changed. The narrative references
+        what moved and what did not.
+
+        Args:
+            rule_type: One of neighbour, stray, rift, fork, echo, shift.
+            fragment_a: The first (or only) fragment text.
+            fragment_b: The second fragment text (None for stray/shift).
+            original_finding: The original narrative for this finding.
+            scores: The updated Stage 2 scores after re-running signals.
+            clarification: What the student typed.
+            score_deltas: Dict of {metric: {old, new, delta}} showing changes.
+
+        Returns:
+            The revised narrative text for this finding.
+        """
+        # Build fragment description
+        if fragment_b:
+            fragment_desc = (
+                f'Fragment A: "{fragment_a}"\n'
+                f'Fragment B: "{fragment_b}"'
+            )
+        else:
+            fragment_desc = f'Fragment: "{fragment_a}"'
+
+        # Format scores for the prompt
+        score_lines = []
+        for k, v in scores.items():
+            if isinstance(v, float):
+                score_lines.append(f"  {k}: {v:.4f}")
+            elif isinstance(v, list):
+                score_lines.append(f"  {k}: {', '.join(str(x) for x in v)}")
+            else:
+                score_lines.append(f"  {k}: {v}")
+        scores_text = "\n".join(score_lines) if score_lines else "  (no numeric scores for this finding type)"
+
+        # Format score deltas
+        delta_text = ""
+        if score_deltas:
+            delta_lines = []
+            for metric, d in score_deltas.items():
+                direction = "increased" if d["delta"] > 0 else "decreased"
+                delta_lines.append(f"  {metric}: {d['old']:.3f} → {d['new']:.3f} ({direction} by {abs(d['delta']):.3f})")
+            delta_text = "\n\nScore changes after your clarification:\n" + "\n".join(delta_lines)
+            delta_text += "\n\nThese changes are real — the tool re-ran its analysis with your clarification included."
+        else:
+            delta_text = "\n\nScores could not be re-computed for this finding type (requires the full fragment set). The narrative is revised with your context but the original scores stand."
+
+        system_prompt = f"""You are revising a single finding from a fragment analysis tool. The tool has re-run its analysis with the student's clarification included as additional text.
+
+The tool originally found a {rule_type} between these fragments:
+{fragment_desc}
+
+The original finding was: {original_finding}
+
+Updated scores (after re-running with clarification):
+{scores_text}
+{delta_text}
+
+The student's clarification: {clarification}
+
+Revise the narrative for this ONE finding based on the updated scores.
+
+If the scores moved significantly (e.g., embedding similarity increased by >0.1), the clarification made a real difference — the connection the student described is now visible in the combined text. Acknowledge this: "With your clarification included, the semantic distance between these fragments dropped from X to Y. The connection you described — [quote their clarification] — is genuine but was not visible in the original text alone."
+
+If the scores barely moved (<0.05 change), the clarification did not change the tool's reading. Say so honestly: "Even with your clarification, the distance between these fragments remains high (X). The connection you describe may be real, but it is not yet visible in your writing."
+
+2-3 sentences. Be specific. Reference the actual score changes. Quote brief phrases from the student's clarification and fragments. Do not use markdown formatting."""
+
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": "Revise this finding."},
+            ],
+            temperature=0.5,
+            max_tokens=250,
+        )
+
+        content = response.choices[0].message.content or ""
+        return content.strip()
+
     async def narrate_stream(
         self, analysis: dict
     ) -> AsyncGenerator[str, None]:

@@ -56,6 +56,21 @@ Write text fragments. Get a structural map showing how they relate -- where they
 
 Claude Haiku describes what the rules found. It cannot alter the counts or relationships. Observational, not prescriptive.
 
+### Clarify: "I Disagree" (4 April 2026)
+
+Each individual finding has an "I disagree" option. When the tool's reading does not match what you intended, you can push back:
+
+1. Tap "I disagree" on any finding
+2. The tool asks a targeted question specific to that rule type (e.g., "The tool sees these two fragments as disconnected. What connection did you intend?")
+3. You articulate the missing connection
+4. The tool re-runs the full Stage 1 pipeline on the combined text (original fragments + your clarification)
+5. Stage 2 re-applies the same deterministic rules to the updated signals
+6. You see the score changes numerically (e.g., "Semantic distance: 0.73 → 0.41")
+
+The tool does not take your word for it. Your clarification is additional text for Stage 1 to read. If the connection you describe shows up in the combined text, the scores shift. If it does not, they stay. The architecture holds — AI qualifies the expanded input, code judges the new signals, language narrates what changed.
+
+This means the student must articulate the connection in words. "They are connected" is not enough — you have to say how. That articulation is itself the work the tool was designed to provoke.
+
 ---
 
 ## Configuration
