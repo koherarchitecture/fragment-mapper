@@ -219,7 +219,7 @@ class FragmentNarrator:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,
-            max_tokens=500,
+            max_tokens=700,
         )
 
         content = response.choices[0].message.content or ""
@@ -342,7 +342,7 @@ If the scores barely moved (<0.05 change), the clarification did not change the 
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,
-            max_tokens=500,
+            max_tokens=700,
             stream=True,
         )
 
