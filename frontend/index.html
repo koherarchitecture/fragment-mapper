@@ -1139,6 +1139,10 @@ function buildCanvasKey(frags, data) {
     '<strong>Filled</strong> — has neighbours'
   ));
   items.push(legendItem(
+    '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="#8F8880" opacity="0.35" stroke="#8F8880" stroke-width="1"/></svg>',
+    '<strong>Semi-filled</strong> — unclustered, moderate connections but no group'
+  ));
+  items.push(legendItem(
     '<svg width="20" height="20"><circle cx="10" cy="10" r="8" fill="none" stroke="#8F8880" stroke-width="2"/></svg>',
     '<strong>Hollow</strong> — stray, drifts alone (a seed, not a problem)'
   ));
@@ -1205,13 +1209,15 @@ function legendItem(icon, text) {
 function buildSummary(data) {
   document.getElementById('summary-section').style.display = '';
   const c = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const rc = c(data.rifts), fc = c(data.forks), ec = c(data.echoes);
   const rules = [
-    ['neighbours', c(data.neighbours)],
-    ['strays', c(data.strays)],
-    ['rifts', c(data.rifts)],
-    ['forks', c(data.forks)],
-    ['echoes', c(data.echoes)],
-    ['shifts', c(data.shifts)],
+    ['neighbours', c(data.neighbours), ''],
+    ['unclustered', c(data.unclustered), ''],
+    ['strays', c(data.strays), ''],
+    ['rifts', rc, rc === 1 ? ' pair' : ' pairs'],
+    ['forks', fc, fc === 1 ? ' pair' : ' pairs'],
+    ['echoes', ec, ec === 1 ? ' pair' : ' pairs'],
+    ['shifts', c(data.shifts), ''],
   ];
 
   const active = rules.filter(([_, n]) => n > 0).length;
@@ -1219,8 +1225,8 @@ function buildSummary(data) {
   document.getElementById('summary-section').innerHTML =
     '<div class="fm-summary-label">' + data.fragment_count + ' fragments — ' + active + ' of 6 rules active</div>' +
     '<div class="k-chips">' +
-    rules.map(([name, count]) =>
-      '<span class="k-chip' + (count > 0 ? ' k-chip-accent' : '') + '">' + name + ': ' + count + '</span>'
+    rules.map(([name, count, unit]) =>
+      '<span class="k-chip' + (count > 0 ? ' k-chip-accent' : '') + '">' + name + ': ' + count + unit + '</span>'
     ).join('') +
     '</div>';
 }
@@ -1230,13 +1236,15 @@ function buildSummary(data) {
 
 function buildGlossary(data) {
   const c = (arr) => Array.isArray(arr) ? arr.length : 0;
+  const pairLabel = (n) => n === 1 ? '1 pair' : n + ' pairs';
   const defs = [
-    ['Neighbours', c(data.neighbours), 'Fragments that share enough vocabulary and meaning to form a group. They orbit the same territory — different angles on the same idea.'],
-    ['Strays', c(data.strays), 'Fragments that sit apart from everything else. They share little vocabulary or meaning with any other fragment. Not a problem — a stray might be a seed that nothing else has grown around yet.'],
-    ['Rifts', c(data.rifts), 'Two fragments about the same topic that pull in opposite emotional directions. The words overlap but the feeling diverges — one affirms where the other resists.'],
-    ['Forks', c(data.forks), 'Two fragments about the same idea expressed in notably different vocabulary. The meaning is close but the language has diverged — you might be developing two separate framings for the same thing.'],
-    ['Echoes', c(data.echoes), 'Fragments about different topics that share the same voice — similar emotional tone, similar writing patterns. An unconscious thread connecting otherwise separate ideas.'],
-    ['Shifts', c(data.shifts), 'A fragment written in a markedly different voice from the rest — shorter or longer sentences, more questions, more hedging. The change in register is distinctive, not wrong.'],
+    ['Neighbours', c(data.neighbours), String(c(data.neighbours)), 'Fragments that share enough vocabulary and meaning to form a group. They orbit the same territory — different angles on the same idea.'],
+    ['Unclustered', c(data.unclustered), String(c(data.unclustered)), 'Fragments with moderate connections — related enough that they are not isolated, but not similar enough to form a named group. They float between territories. Most fragments land here.'],
+    ['Strays', c(data.strays), String(c(data.strays)), 'Fragments that sit apart from everything else. They share little vocabulary or meaning with any other fragment. Not a problem — a stray might be a seed that nothing else has grown around yet.'],
+    ['Rifts', c(data.rifts), pairLabel(c(data.rifts)), 'A pair of fragments about the same topic that pull in opposite emotional directions. The words overlap but the feeling diverges — one affirms where the other resists.'],
+    ['Forks', c(data.forks), pairLabel(c(data.forks)), 'A pair of fragments about the same idea expressed in notably different vocabulary. The meaning is close but the language has diverged — you might be developing two separate framings for the same thing.'],
+    ['Echoes', c(data.echoes), pairLabel(c(data.echoes)), 'A pair of fragments about different topics that share the same voice — similar emotional tone, similar writing patterns. An unconscious thread connecting otherwise separate ideas.'],
+    ['Shifts', c(data.shifts), String(c(data.shifts)), 'A fragment written in a markedly different voice from the rest — shorter or longer sentences, more questions, more hedging. The change in register is distinctive, not wrong.'],
   ];
 
   const active = defs.filter(([_, n]) => n > 0);
@@ -1246,9 +1254,9 @@ function buildGlossary(data) {
   }
 
   document.getElementById('glossary-section').style.display = '';
-  document.getElementById('glossary-items').innerHTML = active.map(([name, count, desc]) =>
+  document.getElementById('glossary-items').innerHTML = active.map(([name, _count, label, desc]) =>
     '<div class="fm-glossary-item">' +
-    '<span class="fm-glossary-label">' + name + ' (' + count + ')</span>' +
+    '<span class="fm-glossary-label">' + name + ' (' + label + ')</span>' +
     '<span>' + desc + '</span>' +
     '</div>'
   ).join('');
@@ -1617,6 +1625,7 @@ function initCanvas(data) {
   const n = data.fragment_count;
   const straySet = new Set(data.strays || []);
   const shiftSet = new Set(data.shifts || []);
+  const unclusteredSet = new Set(data.unclustered || []);
   const neighbourOf = new Map();
   for (const group of (data.neighbours || [])) {
     for (const idx of group) neighbourOf.set(idx, group);
@@ -1696,6 +1705,7 @@ function initCanvas(data) {
           label: String(i + 1),
           isStray: straySet.has(i),
           isShift: shiftSet.has(i),
+          isUnclustered: unclusteredSet.has(i),
         });
       }
     };
@@ -1821,7 +1831,14 @@ function initCanvas(data) {
             const a2 = a1 + (p.TWO_PI / 16);
             p.arc(nd.x, nd.y, drawR * 2 + 8, drawR * 2 + 8, a1, a2);
           }
+        } else if (nd.isUnclustered) {
+          // Unclustered: semi-transparent fill with thin border
+          p.fill(nd.col[0], nd.col[1], nd.col[2], alpha * 0.45);
+          p.stroke(nd.col[0], nd.col[1], nd.col[2], alpha * 0.6);
+          p.strokeWeight(1);
+          p.circle(nd.x, nd.y, drawR * 2);
         } else {
+          // Neighbours: full filled
           p.fill(nd.col[0], nd.col[1], nd.col[2], alpha);
           p.circle(nd.x, nd.y, drawR * 2);
         }
@@ -1845,6 +1862,7 @@ function initCanvas(data) {
           const preview = frag.length > 100 ? frag.substring(0, 100) + '...' : frag;
           const roles = [];
           if (nd.isStray) roles.push('stray');
+          if (nd.isUnclustered) roles.push('unclustered');
           if (nd.isShift) roles.push('shift');
           if (neighbourOf.has(hoveredNode)) roles.push('neighbour');
           for (const [a,b] of riftPairs) { if (a === hoveredNode || b === hoveredNode) { roles.push('rift'); break; } }
