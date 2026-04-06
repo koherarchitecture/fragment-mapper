@@ -11,6 +11,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/frontend/koher-ui.css">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.9.0/p5.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M 60 35 Q 100 65, 60 100 Q 20 135, 60 165' fill='none' stroke='%234A6FA5' stroke-width='18' stroke-linecap='round'/%3E%3Cpath d='M 100 35 Q 60 65, 100 100 Q 140 135, 100 165' fill='none' stroke='%23E8B86D' stroke-width='16' stroke-linecap='round'/%3E%3Cpath d='M 140 35 Q 100 65, 140 100 Q 180 135, 140 165' fill='none' stroke='%23F7F3ED' stroke-width='14' stroke-linecap='round' opacity='0.8'/%3E%3C/svg%3E">
 
@@ -693,8 +694,13 @@ The discomfort is where the learning lives."></textarea>
 
         <!-- Results heading -->
         <div class="fm-results-heading">
-          <div class="k-title" style="font-size:22px;margin-bottom:6px">What the rules found</div>
-          <p class="k-sub">The six rules examined your fragments for structural relationships. Here is what surfaced.</p>
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:12px">
+            <div>
+              <div class="k-title" style="font-size:22px;margin-bottom:6px">What the rules found</div>
+              <p class="k-sub">The six rules examined your fragments for structural relationships. Here is what surfaced.</p>
+            </div>
+            <button class="k-btn-outline" id="download-btn" style="display:none;white-space:nowrap;flex-shrink:0;font-size:12px;padding:8px 16px" onclick="downloadTranscript()">Download Transcript</button>
+          </div>
         </div>
 
         <!-- Summary chips -->
@@ -952,6 +958,7 @@ async function runAnalysis() {
   document.getElementById('fragment-list-section').style.display = 'none';
   document.getElementById('glossary-section').style.display = 'none';
   document.getElementById('findings-section').style.display = 'none';
+  document.getElementById('download-btn').style.display = 'none';
   document.getElementById('findings-items').innerHTML = '';
   window._findings = [];
 
@@ -1048,6 +1055,7 @@ function handleSSE(event, data, frags) {
       // Hide input form and hero — results are the focus now
       document.querySelector('.fm-hero').style.display = 'none';
       document.querySelector('.fm-input-section').style.display = 'none';
+      document.getElementById('download-btn').style.display = '';
       buildSummary(data);
       buildGlossary(data);
       buildFindings(data);
@@ -1918,6 +1926,140 @@ function initCanvas(data) {
 
     p.windowResized = () => { p.resizeCanvas(container.clientWidth, container.clientHeight); p.loop(); };
   }, container);
+}
+
+
+/* ── Download transcript (PDF) ─────────────────────────────────── */
+
+function downloadTranscript() {
+  if (!analysisData) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const margin = 20;
+  const pageW = 170; // usable width
+  let y = margin;
+
+  function checkPage(needed) {
+    if (y + needed > 275) { doc.addPage(); y = margin; }
+  }
+
+  // Title
+  doc.setFontSize(18);
+  doc.setFont('helvetica', 'bold');
+  doc.text('Fragment Mapper — Transcript', margin, y);
+  y += 10;
+
+  // Timestamp
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  const now = new Date();
+  doc.text(now.toLocaleString('en-GB', {
+    day: 'numeric', month: 'long', year: 'numeric',
+    hour: '2-digit', minute: '2-digit'
+  }), margin, y);
+  y += 12;
+
+  // Fragments
+  const fragments = analysisData.fragments || [];
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('FRAGMENTS (' + fragments.length + ')', margin, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  for (let i = 0; i < fragments.length; i++) {
+    const label = (i + 1) + '. ';
+    const lines = doc.splitTextToSize(label + fragments[i], pageW);
+    checkPage(lines.length * 5 + 4);
+    doc.text(lines, margin, y);
+    y += lines.length * 5 + 4;
+  }
+  y += 8;
+
+  // Summary
+  checkPage(20);
+  doc.setFontSize(12);
+  doc.setFont('helvetica', 'bold');
+  doc.text('SUMMARY', margin, y);
+  y += 8;
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+
+  const counts = [
+    ['Neighbours', (analysisData.neighbours || []).length, 'groups'],
+    ['Unclustered', (analysisData.unclustered || []).length, ''],
+    ['Strays', (analysisData.strays || []).length, ''],
+    ['Rifts', (analysisData.rifts || []).length, ''],
+    ['Forks', (analysisData.forks || []).length, ''],
+    ['Echoes', (analysisData.echoes || []).length, ''],
+    ['Shifts', (analysisData.shifts || []).length, ''],
+  ];
+  for (const [name, count, unit] of counts) {
+    if (count > 0) {
+      doc.text(name + ': ' + count + (unit ? ' ' + unit : ''), margin, y);
+      y += 6;
+    }
+  }
+  y += 8;
+
+  // Narrative
+  if (narrativeText) {
+    checkPage(20);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('NARRATIVE', margin, y);
+    y += 8;
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'normal');
+    const nLines = doc.splitTextToSize(narrativeText, pageW);
+    for (let i = 0; i < nLines.length; i++) {
+      checkPage(6);
+      doc.text(nLines[i], margin, y);
+      y += 5;
+    }
+    y += 8;
+  }
+
+  // Individual findings
+  const findings = window._findings || [];
+  if (findings.length > 0) {
+    checkPage(20);
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.text('FINDINGS (' + findings.length + ')', margin, y);
+    y += 8;
+
+    for (const f of findings) {
+      const label = f.type.toUpperCase() + ' — ' + f.indices.map(i => 'Fragment ' + (i + 1)).join(' & ');
+      checkPage(20);
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
+      doc.text(label, margin, y);
+      y += 6;
+      doc.setFont('helvetica', 'normal');
+      const dLines = doc.splitTextToSize(f.desc, pageW);
+      for (let i = 0; i < dLines.length; i++) {
+        checkPage(6);
+        doc.text(dLines[i], margin, y);
+        y += 5;
+      }
+      y += 4;
+    }
+  }
+
+  // Footer
+  doc.setFontSize(9);
+  doc.setTextColor(128);
+  const pageCount = doc.internal.getNumberOfPages();
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    doc.text('Generated by Fragment Mapper — koher.app', margin, 285);
+  }
+
+  const filename = 'fragment-mapper-transcript-' + now.toISOString().slice(0, 10) + '-' + now.toTimeString().slice(0, 5).replace(':', '') + '.pdf';
+  doc.save(filename);
 }
 
 
