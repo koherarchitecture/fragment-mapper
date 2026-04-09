@@ -218,7 +218,7 @@ class FragmentNarrator:
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.5,
+            temperature=0,
             max_tokens=700,
         )
 
@@ -314,7 +314,7 @@ If the scores barely moved (<0.05 change), the clarification did not change the 
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": "Revise this finding."},
             ],
-            temperature=0.5,
+            temperature=0,
             max_tokens=250,
         )
 
@@ -341,7 +341,7 @@ If the scores barely moved (<0.05 change), the clarification did not change the 
                 {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": user_prompt},
             ],
-            temperature=0.5,
+            temperature=0,
             max_tokens=700,
             stream=True,
         )
